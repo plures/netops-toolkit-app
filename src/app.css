@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 38cf592 (feat: wire netops-toolkit Python CLI as Tauri sidecar)
 :root {
 	--color-bg: #1a1a2e;
 	--color-surface: #16213e;
@@ -18,17 +21,23 @@
 	--radius-md: 8px;
 	font-family: system-ui, -apple-system, sans-serif;
 }
+<<<<<<< HEAD
 =======
 /* Global CSS — imported in +layout.svelte script so Svelte does not scope it */
 @import '@plures/design-dojo/tokens.css';
 @import '@plures/design-dojo/tui-tokens.css';
 >>>>>>> c447cdf (feat: Build Inventory Dashboard view with design-dojo Table)
+=======
+>>>>>>> 38cf592 (feat: wire netops-toolkit Python CLI as Tauri sidecar)
 
 *,
 *::before,
 *::after {
 	box-sizing: border-box;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 38cf592 (feat: wire netops-toolkit Python CLI as Tauri sidecar)
 }
 
 body {
@@ -36,6 +45,7 @@ body {
 	background: var(--color-bg);
 	color: var(--color-text);
 	min-height: 100vh;
+<<<<<<< HEAD
 =======
 	margin: 0;
 	padding: 0;
@@ -46,4 +56,6 @@ body {
 	color: var(--color-text, #e8e8e8);
 	font-family: var(--font-sans);
 >>>>>>> c447cdf (feat: Build Inventory Dashboard view with design-dojo Table)
+=======
+>>>>>>> 38cf592 (feat: wire netops-toolkit Python CLI as Tauri sidecar)
 }
