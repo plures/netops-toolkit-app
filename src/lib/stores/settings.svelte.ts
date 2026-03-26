@@ -19,16 +19,106 @@ const DEFAULT_SETTINGS: Settings = {
 	}
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null;
+}
+
+function isString(value: unknown): value is string {
+	return typeof value === 'string';
+}
+
+function isBoolean(value: unknown): value is boolean {
+	return typeof value === 'boolean';
+}
+
+function isNumber(value: unknown): value is number {
+	return typeof value === 'number' && Number.isFinite(value);
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+	return Math.min(Math.max(value, min), max);
+}
+
 function parseSettings(raw: string): Settings {
 	try {
-		const parsed = JSON.parse(raw) as Partial<Settings>;
-		return {
-			sshCredentials: { ...DEFAULT_SETTINGS.sshCredentials, ...parsed.sshCredentials },
-			scanDefaults: { ...DEFAULT_SETTINGS.scanDefaults, ...parsed.scanDefaults },
-			appearance: { ...DEFAULT_SETTINGS.appearance, ...parsed.appearance }
+		const parsedUnknown = JSON.parse(raw) as unknown;
+
+		const settings: Settings = {
+			sshCredentials: { ...DEFAULT_SETTINGS.sshCredentials },
+			scanDefaults: { ...DEFAULT_SETTINGS.scanDefaults },
+			appearance: { ...DEFAULT_SETTINGS.appearance }
 		};
+
+		if (!isRecord(parsedUnknown)) {
+			return settings;
+		}
+
+		const parsed = parsedUnknown as Record<string, unknown>;
+
+		// sshCredentials
+		if (isRecord(parsed.sshCredentials)) {
+			const ssh = parsed.sshCredentials;
+
+			if (isString(ssh.username)) {
+				settings.sshCredentials.username = ssh.username;
+			}
+
+			if (isString(ssh.passwordOrKeyPath)) {
+				settings.sshCredentials.passwordOrKeyPath = ssh.passwordOrKeyPath;
+			}
+
+			if (isNumber(ssh.defaultTimeout)) {
+				// Clamp timeout to a reasonable range (seconds)
+				settings.sshCredentials.defaultTimeout = clampNumber(ssh.defaultTimeout, 1, 300);
+			}
+		}
+
+		// scanDefaults
+		if (isRecord(parsed.scanDefaults)) {
+			const scan = parsed.scanDefaults;
+
+			if (isNumber(scan.defaultConcurrency)) {
+				// Clamp concurrency to a reasonable range
+				settings.scanDefaults.defaultConcurrency = clampNumber(scan.defaultConcurrency, 1, 1024);
+			}
+
+			if (isBoolean(scan.deepScan)) {
+				settings.scanDefaults.deepScan = scan.deepScan;
+			}
+
+			if (isString(scan.outputFormat)) {
+				// Only accept known/allowed output formats
+				const allowedOutputFormats = new Set<string>(['json']);
+				if (allowedOutputFormats.has(scan.outputFormat)) {
+					settings.scanDefaults.outputFormat = scan.outputFormat;
+				}
+			}
+		}
+
+		// appearance
+		if (isRecord(parsed.appearance)) {
+			const appearance = parsed.appearance;
+
+			if (isString(appearance.theme)) {
+				// Only accept known themes
+				const allowedThemes = new Set<string>(['dark', 'light']);
+				if (allowedThemes.has(appearance.theme)) {
+					settings.appearance.theme = appearance.theme;
+				}
+			}
+
+			if (isBoolean(appearance.tuiMode)) {
+				settings.appearance.tuiMode = appearance.tuiMode;
+			}
+		}
+
+		return settings;
 	} catch {
-		return { ...DEFAULT_SETTINGS };
+		return {
+			sshCredentials: { ...DEFAULT_SETTINGS.sshCredentials },
+			scanDefaults: { ...DEFAULT_SETTINGS.scanDefaults },
+			appearance: { ...DEFAULT_SETTINGS.appearance }
+		};
 	}
 }
 
