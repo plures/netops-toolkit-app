@@ -1,3 +1,7 @@
+## [0.3.0] — 2026-03-26
+
+- feat: app shell with sidebar navigation (#10) (098cd27)
+
 # Changelog
 
 ## [0.2.0] — 2026-03-26
