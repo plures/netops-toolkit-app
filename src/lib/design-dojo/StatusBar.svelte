@@ -8,10 +8,10 @@
 		text?: string;
 	}
 
-	let { tui = false, text = 'NetOps Toolkit' }: Props = $props();
+	let { tui: tuiProp, text = 'NetOps Toolkit' }: Props = $props();
 
 	const tuiContext = useTui();
-	const isTui = $derived(tui || $tuiContext);
+	const isTui = $derived(tuiProp === undefined ? $tuiContext : tuiProp);
 </script>
 
 {#if isTui}
