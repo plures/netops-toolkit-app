@@ -235,7 +235,7 @@
 					placeholder="/path/to/hosts.csv"
 					disabled={scan.status === 'running'}
 				/>
-				<span class="form-hint">Optional — overrides subnet if provided</span>
+				<span class="form-hint">Optional — path to a CSV file with hosts</span>
 			</div>
 
 			<div class="form-row form-row--inline">
