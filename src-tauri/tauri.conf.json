@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://* http://localhost:* ws://localhost:*"
+      "csp": null
     }
   },
   "bundle": {
@@ -32,6 +32,20 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/netops-scan"
     ]
+  },
+  "plugins": {
+    "shell": {
+      "open": false,
+      "scope": [
+        {
+          "name": "binaries/netops-scan",
+          "sidecar": true
+        }
+      ]
+    }
   }
 }
