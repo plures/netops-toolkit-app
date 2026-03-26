@@ -7,7 +7,6 @@ const config = {
 
 	kit: {
 		adapter: adapter({
-			// Tauri expects files in the `build` directory
 			pages: 'build',
 			assets: 'build',
 			fallback: 'index.html',
