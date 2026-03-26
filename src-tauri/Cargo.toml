@@ -8,7 +8,7 @@ license = "AGPL-3.0"
 
 [lib]
 name = "netops_toolkit_app_lib"
-crate-type = ["lib", "cdylib", "staticlib"]
+crate-type = ["rlib", "cdylib", "staticlib"]
 
 [[bin]]
 name = "netops-toolkit-app"
