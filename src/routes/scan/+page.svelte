@@ -84,8 +84,32 @@
 		if (scan.status === 'running') return;
 
 		// Derive total host count from subnet (simplified: /24 → 254 hosts etc.)
-		const prefix = parseInt((config.subnet.split('/')[1] || '24'), 10);
-		const total = Math.min(Math.pow(2, 32 - prefix) - 2, 254);
+		const rawPrefix = (config.subnet || '').split('/')[1] ?? '';
+		let prefix = Number.parseInt(rawPrefix, 10);
+
+		if (Number.isNaN(prefix)) {
+			// Fallback to a sane default if the prefix is malformed
+			prefix = 24;
+		}
+
+		// Clamp prefix to valid IPv4 CIDR range
+		if (prefix < 0) prefix = 0;
+		if (prefix > 32) prefix = 32;
+
+		// Handle /31 and /32 explicitly: this mock scanner does not support them
+		if (prefix >= 31) {
+			scan.status = 'error';
+			scan.error = 'Subnets with /31 or /32 prefixes are not supported in this scanner.';
+			scan.scanned = 0;
+			scan.total = 0;
+			scan.devices = [];
+			scan.startedAt = null;
+			scan.elapsedMs = 0;
+			return;
+		}
+
+		const totalHosts = Math.pow(2, 32 - prefix) - 2;
+		const total = Math.min(totalHosts, 254);
 		const allDevices = generateMockDevices(Math.max(1, Math.floor(total * 0.35)));
 
 		scan = {
