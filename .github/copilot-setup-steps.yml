@@ -1,0 +1,8 @@
+name: "Copilot Setup"
+on: workflow_dispatch
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
+    with:
+      node-version: "22"
+  - run: npm install
