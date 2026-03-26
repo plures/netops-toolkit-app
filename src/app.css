@@ -1,0 +1,28 @@
+:root {
+	--surface-1: #141414;
+	--surface-2: #1e1e1e;
+	--color-border: #2a2a2a;
+	--color-text: #e8e8e8;
+	--color-text-muted: #888;
+	--color-accent: #6366f1;
+	--tui-bg: #1a1a2e;
+	--tui-text: #e0e0e0;
+	--tui-accent: #00d4ff;
+	--tui-border: #0f3460;
+	--font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background-color: var(--surface-1);
+	color: var(--color-text);
+	font-family: var(--font-mono);
+	min-height: 100vh;
+}
