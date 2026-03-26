@@ -316,9 +316,12 @@
 				<ProgressBar
 					value={scan.scanned}
 					max={scan.total}
-					label="Scan progress — {scan.scanned} of {scan.total} hosts checked"
+					label={`Scan progress — ${scan.scanned} of ${scan.total} hosts checked`}
 				/>
-				<span class="progress-count" aria-label="Scanned {scan.scanned} of {scan.total} hosts">
+				<span
+					class="progress-count"
+					aria-label={`Scanned ${scan.scanned} of ${scan.total} hosts`}
+				>
 					{scan.scanned}/{scan.total}
 				</span>
 			</div>
