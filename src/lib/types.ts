@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 /** Represents a discovered network device. */
+=======
+/** Represents a discovered network device */
+>>>>>>> 6e090c1 (Changes before error encountered)
 export interface Device {
 	hostname: string;
 	ip: string;
@@ -8,7 +12,11 @@ export interface Device {
 	serialNumber?: string;
 }
 
+<<<<<<< HEAD
 /** Scan configuration submitted by the user. */
+=======
+/** Scan configuration submitted by the user */
+>>>>>>> 6e090c1 (Changes before error encountered)
 export interface ScanConfig {
 	subnet: string;
 	csvPath: string;
@@ -18,8 +26,13 @@ export interface ScanConfig {
 	concurrency: number;
 }
 
+<<<<<<< HEAD
 /** Live state of a running (or completed) scan. */
 export type ScanStatus = 'idle' | 'running' | 'complete' | 'error' | 'cancelled';
+=======
+/** Live state of a running (or completed) scan */
+export type ScanStatus = 'idle' | 'running' | 'complete' | 'error';
+>>>>>>> 6e090c1 (Changes before error encountered)
 
 export interface ScanState {
 	status: ScanStatus;
@@ -31,12 +44,17 @@ export interface ScanState {
 	error: string | null;
 }
 
+<<<<<<< HEAD
 /** Summary produced at the end of a scan. */
+=======
+/** Summary produced at the end of a scan */
+>>>>>>> 6e090c1 (Changes before error encountered)
 export interface ScanSummary {
 	totalDevices: number;
 	vendors: Record<string, number>;
 	durationMs: number;
 }
+<<<<<<< HEAD
 
 // ---------------------------------------------------------------------------
 // Tauri event payloads (emitted from the Rust backend)
@@ -77,3 +95,5 @@ export interface ScanEvents {
 	'scan:complete': CompleteEvent;
 	'scan:error': ScanErrorEvent;
 }
+=======
+>>>>>>> 6e090c1 (Changes before error encountered)
