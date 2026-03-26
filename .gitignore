@@ -1,4 +1,7 @@
 node_modules/
-target/
 build/
 .svelte-kit/
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/
