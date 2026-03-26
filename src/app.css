@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 :root {
 	--color-bg: #1a1a2e;
 	--color-surface: #16213e;
@@ -17,11 +18,17 @@
 	--radius-md: 8px;
 	font-family: system-ui, -apple-system, sans-serif;
 }
+=======
+/* Global CSS — imported in +layout.svelte script so Svelte does not scope it */
+@import '@plures/design-dojo/tokens.css';
+@import '@plures/design-dojo/tui-tokens.css';
+>>>>>>> c447cdf (feat: Build Inventory Dashboard view with design-dojo Table)
 
 *,
 *::before,
 *::after {
 	box-sizing: border-box;
+<<<<<<< HEAD
 }
 
 body {
@@ -29,4 +36,14 @@ body {
 	background: var(--color-bg);
 	color: var(--color-text);
 	min-height: 100vh;
+=======
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	background: var(--surface-0, #0a0a0a);
+	color: var(--color-text, #e8e8e8);
+	font-family: var(--font-sans);
+>>>>>>> c447cdf (feat: Build Inventory Dashboard view with design-dojo Table)
 }
