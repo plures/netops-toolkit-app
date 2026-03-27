@@ -48,9 +48,19 @@
 		if (!diffResult) return [];
 		return diffResult.unified.split('\n').map((line) => {
 			let type: 'add' | 'del' | 'header' | 'context' = 'context';
-			if (line.startsWith('+')) type = 'add';
-			else if (line.startsWith('-')) type = 'del';
-			else if (line.startsWith('@@')) type = 'header';
+			if (
+				line.startsWith('@@') ||
+				line.startsWith('+++ ') ||
+				line.startsWith('--- ') ||
+				line.startsWith('diff ') ||
+				line.startsWith('index ')
+			) {
+				type = 'header';
+			} else if (line.startsWith('+')) {
+				type = 'add';
+			} else if (line.startsWith('-')) {
+				type = 'del';
+			}
 			return { text: line, type };
 		});
 	});
