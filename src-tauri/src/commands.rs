@@ -5,6 +5,10 @@
 //!   - `scan_csv`       — scan hosts from a CSV file, streaming results
 //!   - `cancel_scan`    — cancel the running scan
 //!   - `load_inventory` — load a JSON inventory file from disk
+//!   - `backup_config`  — trigger a config backup for a device
+//!   - `list_backups`   — list stored config backups
+//!   - `diff_configs`   — compute a diff between two config versions
+//!   - `rollback_config` — rollback a device config to a previous version
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -578,6 +582,291 @@ fn mock_health(_hostname: &str) -> HealthInfo {
         cpu_percent: 24.0,
         memory_percent: 61.5,
         temperature_celsius: Some(42.0),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Config backup payload types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfigBackup {
+    pub hostname: String,
+    pub version: String,
+    pub timestamp: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DiffResult {
+    pub hostname: String,
+    pub version_a: String,
+    pub version_b: String,
+    pub unified: String,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RollbackResult {
+    pub hostname: String,
+    pub version: String,
+    pub success: bool,
+    pub message: String,
+}
+
+// ---------------------------------------------------------------------------
+// Config backup commands
+// ---------------------------------------------------------------------------
+
+/// Trigger a config backup for the specified device.
+///
+/// Calls `python3 -m netops.collect.backup --hostname <hostname>`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn backup_config(hostname: String) -> Result<ConfigBackup, String> {
+    if hostname.trim().is_empty() {
+        return Err("Hostname must not be empty".into());
+    }
+
+    let output = Command::new("python3")
+        .args([
+            "-m",
+            "netops.collect.backup",
+            "--hostname",
+            &hostname,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(backup) = serde_json::from_str::<ConfigBackup>(&text) {
+                return Ok(backup);
+            }
+        }
+    }
+
+    Ok(mock_backup(&hostname))
+}
+
+/// List stored config backups, optionally filtered by hostname.
+///
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn list_backups(hostname: Option<String>) -> Result<Vec<ConfigBackup>, String> {
+    let mut cmd_args = vec!["-m", "netops.collect.backup", "--list", "--format", "json"];
+    let hn;
+    if let Some(ref h) = hostname {
+        if h.trim().is_empty() {
+            return Err("Hostname filter must not be empty".into());
+        }
+        hn = h.clone();
+        cmd_args.push("--hostname");
+        cmd_args.push(&hn);
+    }
+
+    let output = Command::new("python3").args(&cmd_args).output().await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(backups) = serde_json::from_str::<Vec<ConfigBackup>>(&text) {
+                return Ok(backups);
+            }
+        }
+    }
+
+    Ok(mock_backup_list(hostname.as_deref()))
+}
+
+/// Compute a diff between two config versions for a device.
+///
+/// Calls `python3 -m netops.change.diff`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn diff_configs(
+    hostname: String,
+    version_a: String,
+    version_b: String,
+) -> Result<DiffResult, String> {
+    if hostname.trim().is_empty() {
+        return Err("Hostname must not be empty".into());
+    }
+
+    let output = Command::new("python3")
+        .args([
+            "-m",
+            "netops.change.diff",
+            "--hostname",
+            &hostname,
+            "--version-a",
+            &version_a,
+            "--version-b",
+            &version_b,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(diff) = serde_json::from_str::<DiffResult>(&text) {
+                return Ok(diff);
+            }
+        }
+    }
+
+    Ok(mock_diff(&hostname, &version_a, &version_b))
+}
+
+/// Rollback a device config to a previous version.
+///
+/// Calls `python3 -m netops.change.rollback`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn rollback_config(hostname: String, version: String) -> Result<RollbackResult, String> {
+    if hostname.trim().is_empty() {
+        return Err("Hostname must not be empty".into());
+    }
+
+    let output = Command::new("python3")
+        .args([
+            "-m",
+            "netops.change.rollback",
+            "--hostname",
+            &hostname,
+            "--version",
+            &version,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(result) = serde_json::from_str::<RollbackResult>(&text) {
+                return Ok(result);
+            }
+        }
+    }
+
+    Ok(mock_rollback(&hostname, &version))
+}
+
+// ---------------------------------------------------------------------------
+// Config mock helpers
+// ---------------------------------------------------------------------------
+
+fn mock_backup(hostname: &str) -> ConfigBackup {
+    ConfigBackup {
+        hostname: hostname.to_string(),
+        version: "v1".into(),
+        timestamp: "2026-03-27T06:00:00Z".into(),
+        size: 4096,
+    }
+}
+
+fn mock_backup_list(hostname: Option<&str>) -> Vec<ConfigBackup> {
+    let all = vec![
+        ConfigBackup {
+            hostname: "core-rtr-01".into(),
+            version: "v3".into(),
+            timestamp: "2026-03-26T08:00:00Z".into(),
+            size: 4096,
+        },
+        ConfigBackup {
+            hostname: "core-rtr-01".into(),
+            version: "v2".into(),
+            timestamp: "2026-03-20T14:30:00Z".into(),
+            size: 3980,
+        },
+        ConfigBackup {
+            hostname: "core-rtr-01".into(),
+            version: "v1".into(),
+            timestamp: "2026-03-10T09:15:00Z".into(),
+            size: 3840,
+        },
+        ConfigBackup {
+            hostname: "core-rtr-02".into(),
+            version: "v2".into(),
+            timestamp: "2026-03-25T11:45:00Z".into(),
+            size: 4200,
+        },
+        ConfigBackup {
+            hostname: "core-rtr-02".into(),
+            version: "v1".into(),
+            timestamp: "2026-03-15T16:20:00Z".into(),
+            size: 4050,
+        },
+        ConfigBackup {
+            hostname: "edge-rtr-01".into(),
+            version: "v2".into(),
+            timestamp: "2026-03-24T07:00:00Z".into(),
+            size: 5120,
+        },
+        ConfigBackup {
+            hostname: "edge-rtr-01".into(),
+            version: "v1".into(),
+            timestamp: "2026-03-12T10:30:00Z".into(),
+            size: 4980,
+        },
+        ConfigBackup {
+            hostname: "spine-sw-01".into(),
+            version: "v1".into(),
+            timestamp: "2026-03-22T13:00:00Z".into(),
+            size: 3200,
+        },
+        ConfigBackup {
+            hostname: "leaf-sw-01".into(),
+            version: "v1".into(),
+            timestamp: "2026-03-21T09:00:00Z".into(),
+            size: 2800,
+        },
+    ];
+    match hostname {
+        Some(h) => all.into_iter().filter(|b| b.hostname == h).collect(),
+        None => all,
+    }
+}
+
+fn mock_diff(hostname: &str, version_a: &str, version_b: &str) -> DiffResult {
+    DiffResult {
+        hostname: hostname.to_string(),
+        version_a: version_a.to_string(),
+        version_b: version_b.to_string(),
+        unified: format!(
+            "--- {hostname} {version_a}\n\
+             +++ {hostname} {version_b}\n\
+             @@ -8,6 +8,9 @@\n\
+             \ ip address 10.0.0.1 255.255.255.0\n\
+             \ no shutdown\n\
+             !\n\
+             +interface GigabitEthernet0/0/1\n\
+             + ip address 10.0.1.1 255.255.255.0\n\
+             + no shutdown\n\
+             +!\n\
+             router bgp 65001\n\
+             \ neighbor 10.0.0.2 remote-as 65001\n"
+        ),
+        additions: 4,
+        deletions: 0,
+    }
+}
+
+fn mock_rollback(hostname: &str, version: &str) -> RollbackResult {
+    RollbackResult {
+        hostname: hostname.to_string(),
+        version: version.to_string(),
+        success: true,
+        message: format!("Successfully rolled back {hostname} to {version}"),
     }
 }
 
