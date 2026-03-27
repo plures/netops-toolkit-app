@@ -5,6 +5,7 @@
 //!   - `scan_csv`       — scan hosts from a CSV file, streaming results
 //!   - `cancel_scan`    — cancel the running scan
 //!   - `load_inventory` — load a JSON inventory file from disk
+//!   - `get_fleet_health` — aggregate health across all devices
 //!   - `backup_config`  — trigger a config backup for a device
 //!   - `list_backups`   — list stored config backups
 //!   - `diff_configs`   — compute a diff between two config versions
@@ -582,6 +583,235 @@ fn mock_health(_hostname: &str) -> HealthInfo {
         cpu_percent: 24.0,
         memory_percent: 61.5,
         temperature_celsius: Some(42.0),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fleet health payload types & command
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Clone)]
+pub struct InterfaceErrorEntry {
+    pub interface_name: String,
+    pub crc_errors: u64,
+    pub input_errors: u64,
+    pub output_errors: u64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct LogAlertEntry {
+    pub timestamp: String,
+    pub severity: String,
+    pub source: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct DeviceHealthEntry {
+    pub hostname: String,
+    pub ip: String,
+    pub vendor: String,
+    pub status: String,
+    pub cpu_percent: f32,
+    pub memory_percent: f32,
+    pub temperature_celsius: Option<f32>,
+    pub interface_errors: Vec<InterfaceErrorEntry>,
+    pub log_alerts: Vec<LogAlertEntry>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct FleetHealthSummary {
+    pub total: u32,
+    pub healthy: u32,
+    pub warning: u32,
+    pub critical: u32,
+    pub unreachable: u32,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct VendorHealthSummary {
+    pub vendor: String,
+    pub total: u32,
+    pub healthy: u32,
+    pub warning: u32,
+    pub critical: u32,
+    pub unreachable: u32,
+    pub avg_cpu: f32,
+    pub avg_memory: f32,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct FleetHealth {
+    pub devices: Vec<DeviceHealthEntry>,
+    pub summary: FleetHealthSummary,
+    pub vendor_breakdown: Vec<VendorHealthSummary>,
+    pub last_updated: String,
+}
+
+/// Retrieve aggregate fleet health data across all devices.
+///
+/// Calls the netops-toolkit sidecar with `netops.report.health_dashboard` and
+/// returns parsed fleet health summary. Falls back to mock data when the
+/// sidecar is unavailable.
+#[tauri::command]
+pub async fn get_fleet_health() -> Result<FleetHealth, String> {
+    let output = Command::new("python3")
+        .args(["-m", "netops.report.health_dashboard", "--format", "json"])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(health) = serde_json::from_str::<FleetHealth>(&text) {
+                return Ok(health);
+            }
+        }
+    }
+
+    Ok(mock_fleet_health())
+}
+
+fn mock_fleet_health() -> FleetHealth {
+    let devices = vec![
+        DeviceHealthEntry {
+            hostname: "core-rtr-01".into(),
+            ip: "10.0.0.1".into(),
+            vendor: "Cisco".into(),
+            status: "healthy".into(),
+            cpu_percent: 24.0,
+            memory_percent: 61.0,
+            temperature_celsius: Some(42.0),
+            interface_errors: vec![],
+            log_alerts: vec![LogAlertEntry {
+                timestamp: "2026-03-27T06:12:00Z".into(),
+                severity: "info".into(),
+                source: "core-rtr-01".into(),
+                message: "BGP neighbor 10.0.0.2 Up".into(),
+            }],
+        },
+        DeviceHealthEntry {
+            hostname: "core-rtr-02".into(),
+            ip: "10.0.0.2".into(),
+            vendor: "Cisco".into(),
+            status: "warning".into(),
+            cpu_percent: 78.0,
+            memory_percent: 85.0,
+            temperature_celsius: Some(55.0),
+            interface_errors: vec![InterfaceErrorEntry {
+                interface_name: "Gi0/0/1".into(),
+                crc_errors: 12,
+                input_errors: 45,
+                output_errors: 3,
+            }],
+            log_alerts: vec![LogAlertEntry {
+                timestamp: "2026-03-27T05:58:00Z".into(),
+                severity: "warning".into(),
+                source: "core-rtr-02".into(),
+                message: "CPU utilization above 75% threshold".into(),
+            }],
+        },
+        DeviceHealthEntry {
+            hostname: "edge-rtr-01".into(),
+            ip: "10.0.1.1".into(),
+            vendor: "Nokia".into(),
+            status: "healthy".into(),
+            cpu_percent: 18.0,
+            memory_percent: 44.0,
+            temperature_celsius: Some(38.0),
+            interface_errors: vec![],
+            log_alerts: vec![],
+        },
+        DeviceHealthEntry {
+            hostname: "edge-rtr-02".into(),
+            ip: "10.0.1.2".into(),
+            vendor: "Nokia".into(),
+            status: "critical".into(),
+            cpu_percent: 95.0,
+            memory_percent: 92.0,
+            temperature_celsius: Some(68.0),
+            interface_errors: vec![InterfaceErrorEntry {
+                interface_name: "port-1/1/1".into(),
+                crc_errors: 230,
+                input_errors: 1540,
+                output_errors: 87,
+            }],
+            log_alerts: vec![
+                LogAlertEntry {
+                    timestamp: "2026-03-27T06:01:00Z".into(),
+                    severity: "critical".into(),
+                    source: "edge-rtr-02".into(),
+                    message: "Memory utilization critical — 92%".into(),
+                },
+                LogAlertEntry {
+                    timestamp: "2026-03-27T05:55:00Z".into(),
+                    severity: "major".into(),
+                    source: "edge-rtr-02".into(),
+                    message: "Port 1/1/1 CRC errors exceeding threshold".into(),
+                },
+            ],
+        },
+        DeviceHealthEntry {
+            hostname: "spine-sw-01".into(),
+            ip: "10.1.0.1".into(),
+            vendor: "Arista".into(),
+            status: "healthy".into(),
+            cpu_percent: 12.0,
+            memory_percent: 38.0,
+            temperature_celsius: Some(35.0),
+            interface_errors: vec![],
+            log_alerts: vec![],
+        },
+    ];
+
+    let total = devices.len() as u32;
+    let healthy = devices.iter().filter(|d| d.status == "healthy").count() as u32;
+    let warning = devices.iter().filter(|d| d.status == "warning").count() as u32;
+    let critical = devices.iter().filter(|d| d.status == "critical").count() as u32;
+    let unreachable = devices.iter().filter(|d| d.status == "unreachable").count() as u32;
+
+    FleetHealth {
+        summary: FleetHealthSummary {
+            total,
+            healthy,
+            warning,
+            critical,
+            unreachable,
+        },
+        vendor_breakdown: vec![
+            VendorHealthSummary {
+                vendor: "Cisco".into(),
+                total: 2,
+                healthy: 1,
+                warning: 1,
+                critical: 0,
+                unreachable: 0,
+                avg_cpu: 51.0,
+                avg_memory: 73.0,
+            },
+            VendorHealthSummary {
+                vendor: "Nokia".into(),
+                total: 2,
+                healthy: 1,
+                warning: 0,
+                critical: 1,
+                unreachable: 0,
+                avg_cpu: 56.5,
+                avg_memory: 68.0,
+            },
+            VendorHealthSummary {
+                vendor: "Arista".into(),
+                total: 1,
+                healthy: 1,
+                warning: 0,
+                critical: 0,
+                unreachable: 0,
+                avg_cpu: 12.0,
+                avg_memory: 38.0,
+            },
+        ],
+        devices,
+        last_updated: "2026-03-27T06:15:00Z".into(),
     }
 }
 
