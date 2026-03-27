@@ -606,47 +606,47 @@ pub struct LogAlertEntry {
     pub message: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct DeviceHealthEntry {
-    pub hostname: String,
-    pub ip: String,
-    pub vendor: String,
-    pub status: String,
-    pub cpu_percent: f32,
-    pub memory_percent: f32,
-    pub temperature_celsius: Option<f32>,
-    pub interface_errors: Vec<InterfaceErrorEntry>,
-    pub log_alerts: Vec<LogAlertEntry>,
-}
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    pub struct DeviceHealthEntry {
+        pub hostname: String,
+        pub ip: String,
+        pub vendor: String,
+        pub status: String,
+        pub cpu_percent: f32,
+        pub memory_percent: f32,
+        pub temperature_celsius: Option<f32>,
+        pub interface_errors: Vec<InterfaceErrorEntry>,
+        pub log_alerts: Vec<LogAlertEntry>,
+    }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct FleetHealthSummary {
-    pub total: u32,
-    pub healthy: u32,
-    pub warning: u32,
-    pub critical: u32,
-    pub unreachable: u32,
-}
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    pub struct FleetHealthSummary {
+        pub total: u32,
+        pub healthy: u32,
+        pub warning: u32,
+        pub critical: u32,
+        pub unreachable: u32,
+    }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct VendorHealthSummary {
-    pub vendor: String,
-    pub total: u32,
-    pub healthy: u32,
-    pub warning: u32,
-    pub critical: u32,
-    pub unreachable: u32,
-    pub avg_cpu: f32,
-    pub avg_memory: f32,
-}
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    pub struct VendorHealthSummary {
+        pub vendor: String,
+        pub total: u32,
+        pub healthy: u32,
+        pub warning: u32,
+        pub critical: u32,
+        pub unreachable: u32,
+        pub avg_cpu: f32,
+        pub avg_memory: f32,
+    }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct FleetHealth {
-    pub devices: Vec<DeviceHealthEntry>,
-    pub summary: FleetHealthSummary,
-    pub vendor_breakdown: Vec<VendorHealthSummary>,
-    pub last_updated: String,
-}
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    pub struct FleetHealth {
+        pub devices: Vec<DeviceHealthEntry>,
+        pub summary: FleetHealthSummary,
+        pub vendor_breakdown: Vec<VendorHealthSummary>,
+        pub last_updated: String,
+    }
 
 /// Retrieve aggregate fleet health data across all devices.
 ///
