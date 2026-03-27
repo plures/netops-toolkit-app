@@ -748,6 +748,9 @@ pub async fn rollback_config(hostname: String, version: String) -> Result<Rollba
     if hostname.trim().is_empty() {
         return Err("Hostname must not be empty".into());
     }
+    if version.trim().is_empty() {
+        return Err("Version must not be empty".into());
+    }
 
     let output = Command::new("python3")
         .args([

@@ -15,15 +15,23 @@
 	const getTui = useTui();
 	let tui = $derived(getTui());
 
-	let backups = $state<ConfigBackup[]>(
-		mockBackups.filter((b) => b.hostname === hostname)
-	);
+	let backups = $state<ConfigBackup[]>([]);
 	let selectedIndex = $state<number | undefined>(undefined);
 	let selectedConfig = $state<string | null>(null);
 	let rollbackTarget = $state<string | null>(null);
 	let rollbackConfirm = $state(false);
 	let rollbackMessage = $state<string | null>(null);
 	let collecting = $state(false);
+
+	// Reset state when hostname changes (SvelteKit may reuse the component)
+	$effect(() => {
+		backups = mockBackups.filter((b) => b.hostname === hostname);
+		selectedIndex = undefined;
+		selectedConfig = null;
+		rollbackTarget = null;
+		rollbackConfirm = false;
+		rollbackMessage = null;
+	});
 
 	const columns = [
 		{ key: 'version', label: 'Version', width: 10 },

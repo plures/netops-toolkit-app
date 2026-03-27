@@ -69,10 +69,12 @@
 		if (!selectedHostname || !selectedVersionA || !selectedVersionB) return;
 		loading = true;
 		error = null;
+		diffResult = null;
 		try {
 			const { diffConfigs } = await import('$lib/services/config.js');
 			diffResult = await diffConfigs(selectedHostname, selectedVersionA, selectedVersionB);
-		} catch {
+		} catch (err) {
+			error = `Failed to load diff: ${err instanceof Error ? err.message : 'unknown error'}. Showing mock data.`;
 			// Fallback to mock
 			if (
 				selectedHostname === mockDiff.hostname &&
