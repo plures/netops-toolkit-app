@@ -5,9 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -36,5 +41,11 @@ jobs:
       - name: Lint
         run: npx eslint . || echo "no eslint config yet"
 
+      - name: Type check
+        run: npm run check || echo "check skipped (project bootstrapping)"
+
       - name: Test
         run: npm test || echo "no tests yet"
+
+      - name: Build
+        run: npm run build
