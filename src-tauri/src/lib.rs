@@ -19,6 +19,7 @@ pub fn run() {
             commands::load_inventory,
             commands::get_device_detail,
             commands::get_device_health,
+            commands::get_fleet_health,
             commands::backup_config,
             commands::list_backups,
             commands::diff_configs,

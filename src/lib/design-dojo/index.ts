@@ -7,6 +7,7 @@ export { default as StatusBarItem } from './StatusBarItem.svelte';
 export { default as StatusBarSpacer } from './StatusBarSpacer.svelte';
 export { default as Badge } from './Badge.svelte';
 export { default as Button } from './Button.svelte';
+export { default as ProgressBar } from '../components/ProgressBar.svelte';
 export { provideTui, useTui } from './useTui.js';
 
 /** Search result item returned by SearchInput. */
