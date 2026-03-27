@@ -11,7 +11,6 @@
 		Button,
 		useTui
 	} from '@plures/design-dojo';
-	import { tuiState } from '$lib/stores/tui.svelte.js';
 	import { getDeviceDetail, getDeviceHealth } from '$lib/services/device.js';
 	import type {
 		DeviceDetail,
@@ -66,7 +65,7 @@
 	// ---------------------------------------------------------------------------
 	let isTui = $derived(getTui());
 
-	let filteredConfig = $derived(() => {
+	let filteredConfig = $derived.by(() => {
 		if (!detail) return '';
 		if (!searchQuery) return detail.configOutput;
 		return detail.configOutput
@@ -118,14 +117,6 @@
 		{ id: 'config', label: 'Config', tuiLabel: '[Config]' }
 	];
 
-	function statusBadgeVariant(
-		status: string
-	): 'success' | 'error' | 'neutral' {
-		if (status === 'up') return 'success';
-		if (status === 'down') return 'error';
-		return 'neutral';
-	}
-
 	function bgpStateBadgeVariant(
 		state: string
 	): 'success' | 'warning' | 'neutral' {
@@ -158,8 +149,9 @@
 	{:else if error}
 		<p class="error-msg">{isTui ? `! Error: ${error}` : `Error: ${error}`}</p>
 	{:else if detail}
-		<div class="main-layout">
+		<SplitPane direction="horizontal" tui={isTui}>
 			<!-- System info panel (left) -->
+			<Pane tui={isTui} flex={0} title={isTui ? undefined : 'System Info'}>
 			{#if isTui}
 				<div class="sys-info tui">
 					<div class="sys-title">SYSTEM INFO</div>
@@ -173,7 +165,6 @@
 				</div>
 			{:else}
 				<div class="sys-info gui">
-					<h2>System Info</h2>
 					<dl>
 						<div class="info-row"><dt>Hostname</dt><dd>{detail.systemInfo.hostname}</dd></div>
 						<div class="info-row"><dt>IP</dt><dd>{detail.systemInfo.ip}</dd></div>
@@ -185,9 +176,10 @@
 					</dl>
 				</div>
 			{/if}
+			</Pane>
 
 			<!-- Tab area (right) -->
-			<div class="tab-area">
+			<Pane tui={isTui} flex={1} scrollable>
 				<!-- Tab bar -->
 				<div class="tab-bar" role="tablist" aria-label="Device detail tabs">
 					{#each tabs as tab}
@@ -331,12 +323,12 @@
 									aria-label="Filter config output"
 								/>
 							</div>
-							<pre class="config-output" role="region" aria-label="Device configuration output">{filteredConfig()}</pre>
+							<pre class="config-output" role="region" aria-label="Device configuration output">{filteredConfig}</pre>
 						</div>
 					{/if}
 				</div>
-			</div>
-		</div>
+			</Pane>
+		</SplitPane>
 
 		<!-- Status bar -->
 		<StatusBar tui={isTui} position="bottom">
@@ -403,30 +395,12 @@
 		color: var(--color-error, #f38ba8);
 	}
 
-	/* Main layout: sys-info left + tab-area right */
-	.main-layout {
-		display: flex;
-		flex: 1;
-		overflow: hidden;
-		gap: 0;
-	}
-
 	/* System info panel */
 	.sys-info.gui {
 		width: 220px;
 		min-width: 220px;
 		padding: 16px;
-		border-right: 1px solid var(--color-border, #2a2a2a);
 		overflow: auto;
-		background: var(--surface-2, #1e1e1e);
-	}
-
-	.sys-info.gui h2 {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--color-text-muted, #888);
-		margin: 0 0 12px;
 	}
 
 	.sys-info.gui dl {
@@ -460,7 +434,6 @@
 		width: 32ch;
 		min-width: 32ch;
 		padding: 1ch;
-		border-right: 1px solid var(--tui-border, #0f3460);
 		font-family: monospace;
 		font-size: 0.875rem;
 		overflow: auto;
@@ -485,14 +458,6 @@
 
 	.sys-val {
 		color: var(--tui-text, #e0e0e0);
-	}
-
-	/* Tab area */
-	.tab-area {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
 	}
 
 	/* Tab bar */
