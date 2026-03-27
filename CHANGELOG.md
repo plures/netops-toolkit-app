@@ -1,3 +1,7 @@
+## [0.4.1] — 2026-03-27
+
+- fix: use SplitPane/Pane layout, fix $derived.by, remove dead code in device detail (#28) (d77df8c)
+
 ## [0.4.0] — 2026-03-27
 
 - fix: align package version to v0.3.0 to unblock Release workflow (#27) (0760bb3)
