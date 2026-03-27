@@ -13,6 +13,7 @@
 	const navItems = [
 		{ icon: '📊', label: 'Inventory', href: '/inventory' },
 		{ icon: '🔍', label: 'Scan', href: '/scan' },
+		{ icon: '📋', label: 'Config', href: '/config' },
 		{ icon: '⚙️', label: 'Settings', href: '/settings' }
 	] as const;
 

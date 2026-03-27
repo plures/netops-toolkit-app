@@ -19,6 +19,10 @@ pub fn run() {
             commands::load_inventory,
             commands::get_device_detail,
             commands::get_device_health,
+            commands::backup_config,
+            commands::list_backups,
+            commands::diff_configs,
+            commands::rollback_config,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]
