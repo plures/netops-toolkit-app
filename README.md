@@ -4,6 +4,23 @@ Network operations TUI/GUI built with **Svelte 5 + Tauri 2 + design-dojo**.
 
 Desktop and terminal interface for [netops-toolkit](https://github.com/plures/netops-toolkit).
 
+## Screenshots
+
+### Inventory Dashboard
+Filter, sort, and search across all discovered devices. Vendor breakdown badges and real-time status indicators.
+
+![Inventory Dashboard](docs/screenshots/inventory-dashboard.svg)
+
+### Scan Runner
+Launch network scans with live progress tracking, per-device results streaming, and ETA estimation.
+
+![Scan Runner](docs/screenshots/scan-runner.svg)
+
+### Settings
+Configure SSH credentials, authentication methods, timeouts, and reusable scan profiles.
+
+![Settings](docs/screenshots/settings.svg)
+
 ## Modes
 
 ```bash
