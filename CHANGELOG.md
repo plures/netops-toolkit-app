@@ -1,3 +1,7 @@
+## [0.5.0] — 2026-03-27
+
+- feat: Config backup viewer — collect, diff, and rollback (#29) (63d52cc)
+
 ## [0.4.1] — 2026-03-27
 
 - fix: use SplitPane/Pane layout, fix $derived.by, remove dead code in device detail (#28) (d77df8c)
