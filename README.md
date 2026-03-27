@@ -6,6 +6,11 @@ Desktop and terminal interface for [netops-toolkit](https://github.com/plures/ne
 
 ## Screenshots
 
+### TUI Mode
+The same Svelte app rendered in your terminal via `svelte-ratatui-adapter`. Box-drawing tables, keyboard navigation, status bar — zero GUI dependencies.
+
+![TUI Inventory](docs/screenshots/tui-inventory.svg)
+
 ### Inventory Dashboard
 Filter, sort, and search across all discovered devices. Vendor breakdown badges and real-time status indicators.
 
