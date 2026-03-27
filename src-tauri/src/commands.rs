@@ -590,6 +590,7 @@ fn mock_health(_hostname: &str) -> HealthInfo {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ConfigBackup {
     pub hostname: String,
     pub version: String,
@@ -598,6 +599,7 @@ pub struct ConfigBackup {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DiffResult {
     pub hostname: String,
     pub version_a: String,
@@ -608,6 +610,7 @@ pub struct DiffResult {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct RollbackResult {
     pub hostname: String,
     pub version: String,
