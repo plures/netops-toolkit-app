@@ -602,7 +602,9 @@ pub struct ConfigBackup {
 #[serde(rename_all = "camelCase")]
 pub struct DiffResult {
     pub hostname: String,
+    #[serde(rename = "versionA")]
     pub version_a: String,
+    #[serde(rename = "versionB")]
     pub version_b: String,
     pub unified: String,
     pub additions: u32,
