@@ -1,3 +1,16 @@
+## [0.4.0] — 2026-03-27
+
+- fix: align package version to v0.3.0 to unblock Release workflow (#27) (0760bb3)
+- fix: add strict-peer-deps to prevent peer dependency conflicts (#26) (c5d338f)
+- feat: Device Detail view — system info, interfaces, health, BGP, config tabs (#24) (5847903)
+- docs: add TUI mode screenshot (baeff9a)
+- docs: add screenshots for inventory, scan runner, and settings views (64bf9e1)
+- [WIP] Add scan runner view with progress tracking (#11) (59a0b57)
+- feat: settings view for credentials and scan profiles (#13) (733a82d)
+- feat: Inventory Dashboard view with design-dojo Table (#12) (8873844)
+- feat: wire netops-toolkit Python CLI as Tauri sidecar (#14) (7904daa)
+- feat: app shell with sidebar navigation (#10) (098cd27)
+
 # Changelog
 
 ## [0.2.0] — 2026-03-26
