@@ -31,5 +31,13 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0"
+  },
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/plures/netops-toolkit-app.git"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

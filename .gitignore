@@ -5,3 +5,6 @@ build/
 # Tauri / Rust
 src-tauri/target/
 src-tauri/gen/
+dist/
+.env
+coverage/
