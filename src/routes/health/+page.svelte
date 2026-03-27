@@ -150,16 +150,36 @@
 
 	function toggleAutoRefresh(): void {
 		autoRefresh = !autoRefresh;
-		if (autoRefresh) {
-			refreshTimer = setInterval(() => {
-				refreshData();
-			}, refreshInterval * 1000);
-		} else if (refreshTimer) {
+	}
+
+	$effect(() => {
+		// If auto-refresh is disabled, ensure any existing interval is cleared.
+		if (!autoRefresh) {
+			if (refreshTimer) {
+				clearInterval(refreshTimer);
+				refreshTimer = null;
+			}
+			return;
+		}
+
+		// Clear any existing interval before creating a new one.
+		if (refreshTimer) {
 			clearInterval(refreshTimer);
 			refreshTimer = null;
 		}
-	}
 
+		refreshTimer = setInterval(() => {
+			void refreshData();
+		}, refreshInterval * 1000);
+
+		// Cleanup when dependencies change or component is destroyed.
+		return () => {
+			if (refreshTimer) {
+				clearInterval(refreshTimer);
+				refreshTimer = null;
+			}
+		};
+	});
 	// --- Table columns ---
 	const errorColumns = [
 		{ key: 'hostname', label: 'Device', width: 14 },
