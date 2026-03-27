@@ -701,6 +701,15 @@ pub async fn diff_configs(
     if hostname.trim().is_empty() {
         return Err("Hostname must not be empty".into());
     }
+    if version_a.trim().is_empty() {
+        return Err("Version A must not be empty".into());
+    }
+    if version_b.trim().is_empty() {
+        return Err("Version B must not be empty".into());
+    }
+    if version_a.trim() == version_b.trim() {
+        return Err("Version A and Version B must be different".into());
+    }
 
     let output = Command::new("python3")
         .args([
