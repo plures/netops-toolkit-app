@@ -1,3 +1,7 @@
+## [0.6.0] — 2026-03-27
+
+- feat: health dashboard — fleet-wide CPU, memory, interface errors, log alerts (#30) (baa7d98)
+
 ## [0.5.0] — 2026-03-27
 
 - feat: Config backup viewer — collect, diff, and rollback (#29) (63d52cc)
