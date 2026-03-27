@@ -12,7 +12,7 @@ export async function getFleetHealth(): Promise<FleetHealth> {
 
 /**
  * Fetch live health metrics for a single device.
- * Re-exports from device service for convenience.
+ * Calls the `get_device_health` Tauri command.
  */
 export async function getDeviceHealth(hostname: string): Promise<HealthInfo> {
 	return invoke<HealthInfo>('get_device_health', { hostname });
