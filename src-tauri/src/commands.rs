@@ -383,6 +383,205 @@ pub async fn load_inventory(path: String) -> Result<Vec<serde_json::Value>, Stri
 }
 
 // ---------------------------------------------------------------------------
+// Device detail payload types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Clone)]
+pub struct SystemInfo {
+    pub hostname: String,
+    pub ip: String,
+    pub vendor: String,
+    pub model: String,
+    pub version: String,
+    pub serial: String,
+    pub uptime: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct InterfaceEntry {
+    pub name: String,
+    pub status: String,
+    pub speed: String,
+    pub input_errors: u64,
+    pub output_errors: u64,
+    pub utilization: f32,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct HealthInfo {
+    pub cpu_percent: f32,
+    pub memory_percent: f32,
+    pub temperature_celsius: Option<f32>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct BgpPeer {
+    pub neighbor: String,
+    pub remote_as: u32,
+    pub state: String,
+    pub prefixes_received: u32,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct DeviceDetail {
+    pub system_info: SystemInfo,
+    pub interfaces: Vec<InterfaceEntry>,
+    pub health: HealthInfo,
+    pub bgp_peers: Vec<BgpPeer>,
+    pub config_output: String,
+}
+
+// ---------------------------------------------------------------------------
+// Device detail commands
+// ---------------------------------------------------------------------------
+
+/// Retrieve full device detail for `hostname`.
+///
+/// Calls the netops-toolkit sidecar with device-specific commands and returns
+/// parsed system info, interface list, BGP peers, and raw config output.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn get_device_detail(hostname: String) -> Result<DeviceDetail, String> {
+    // Attempt to call the Python CLI
+    let output = Command::new("python3")
+        .args([
+            "-m",
+            "netops.device.detail",
+            "--hostname",
+            &hostname,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(detail) = serde_json::from_str::<DeviceDetail>(&text) {
+                return Ok(detail);
+            }
+        }
+    }
+
+    // Fall back to mock data
+    Ok(mock_device_detail(&hostname))
+}
+
+/// Retrieve live health metrics (CPU, memory, temperature) for `hostname`.
+///
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn get_device_health(hostname: String) -> Result<HealthInfo, String> {
+    let output = Command::new("python3")
+        .args([
+            "-m",
+            "netops.device.health",
+            "--hostname",
+            &hostname,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(health) = serde_json::from_str::<HealthInfo>(&text) {
+                return Ok(health);
+            }
+        }
+    }
+
+    Ok(mock_health(&hostname))
+}
+
+// ---------------------------------------------------------------------------
+// Mock helpers for offline / sidecar-unavailable scenarios
+// ---------------------------------------------------------------------------
+
+fn mock_device_detail(hostname: &str) -> DeviceDetail {
+    DeviceDetail {
+        system_info: SystemInfo {
+            hostname: hostname.to_string(),
+            ip: "10.0.0.1".into(),
+            vendor: "Cisco IOS".into(),
+            model: "ASR1001-X".into(),
+            version: "16.9.4".into(),
+            serial: "FXS2208Q1GD".into(),
+            uptime: "42 days, 3 hours".into(),
+        },
+        interfaces: vec![
+            InterfaceEntry {
+                name: "GigabitEthernet0/0/0".into(),
+                status: "up".into(),
+                speed: "1G".into(),
+                input_errors: 0,
+                output_errors: 0,
+                utilization: 12.5,
+            },
+            InterfaceEntry {
+                name: "GigabitEthernet0/0/1".into(),
+                status: "up".into(),
+                speed: "1G".into(),
+                input_errors: 2,
+                output_errors: 0,
+                utilization: 5.2,
+            },
+            InterfaceEntry {
+                name: "GigabitEthernet0/0/2".into(),
+                status: "down".into(),
+                speed: "1G".into(),
+                input_errors: 0,
+                output_errors: 0,
+                utilization: 0.0,
+            },
+            InterfaceEntry {
+                name: "Loopback0".into(),
+                status: "up".into(),
+                speed: "—".into(),
+                input_errors: 0,
+                output_errors: 0,
+                utilization: 0.0,
+            },
+        ],
+        health: mock_health(hostname),
+        bgp_peers: vec![
+            BgpPeer {
+                neighbor: "10.0.0.2".into(),
+                remote_as: 65001,
+                state: "Established".into(),
+                prefixes_received: 1024,
+            },
+            BgpPeer {
+                neighbor: "192.168.1.1".into(),
+                remote_as: 65002,
+                state: "Established".into(),
+                prefixes_received: 512,
+            },
+            BgpPeer {
+                neighbor: "172.16.0.1".into(),
+                remote_as: 65003,
+                state: "Active".into(),
+                prefixes_received: 0,
+            },
+        ],
+        config_output: format!(
+            "! Configuration for {hostname}\n!\nversion 16.9\n!\nhostname {hostname}\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.1 255.255.255.0\n no shutdown\n!\nrouter bgp 65001\n neighbor 10.0.0.2 remote-as 65001\n neighbor 192.168.1.1 remote-as 65002\n!\nend\n"
+        ),
+    }
+}
+
+fn mock_health(_hostname: &str) -> HealthInfo {
+    HealthInfo {
+        cpu_percent: 24.0,
+        memory_percent: 61.5,
+        temperature_celsius: Some(42.0),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Input validation
 // ---------------------------------------------------------------------------
 

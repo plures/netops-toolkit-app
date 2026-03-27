@@ -17,6 +17,8 @@ pub fn run() {
             commands::scan_csv,
             commands::cancel_scan,
             commands::load_inventory,
+            commands::get_device_detail,
+            commands::get_device_health,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]

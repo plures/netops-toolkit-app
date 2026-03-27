@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import {
 		Table,
 		SearchInput,
@@ -95,7 +96,10 @@
 	}
 
 	function handleRowSelect(index: number): void {
-		selectedIndex = selectedIndex === index ? undefined : index;
+		const device = filteredDevices[index];
+		if (device) {
+			goto(`/device/${encodeURIComponent(device.name)}`);
+		}
 	}
 
 	// --- SearchInput handlers ---
@@ -122,14 +126,7 @@
 	function handleSearchSelect(item: SearchResult): void {
 		const device = mockInventory.find((d) => d.id === item.id);
 		if (device) {
-			const inFiltered = filteredDevices.findIndex((d) => d.id === device.id);
-			if (inFiltered !== -1) {
-				selectedIndex = inFiltered;
-			} else {
-				vendorFilter = 'all';
-				const idx = mockInventory.findIndex((d) => d.id === device.id);
-				if (idx !== -1) selectedIndex = idx;
-			}
+			goto(`/device/${encodeURIComponent(device.name)}`);
 		}
 	}
 

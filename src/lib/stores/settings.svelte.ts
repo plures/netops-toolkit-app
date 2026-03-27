@@ -90,7 +90,7 @@ function parseSettings(raw: string): Settings {
 				// Only accept known/allowed output formats
 				const allowedOutputFormats = new Set<string>(['json']);
 				if (allowedOutputFormats.has(scan.outputFormat)) {
-					settings.scanDefaults.outputFormat = scan.outputFormat;
+					settings.scanDefaults.outputFormat = scan.outputFormat as import('$lib/types/settings.types.js').OutputFormat;
 				}
 			}
 		}
@@ -103,7 +103,7 @@ function parseSettings(raw: string): Settings {
 				// Only accept known themes
 				const allowedThemes = new Set<string>(['dark', 'light']);
 				if (allowedThemes.has(appearance.theme)) {
-					settings.appearance.theme = appearance.theme;
+					settings.appearance.theme = appearance.theme as import('$lib/types/settings.types.js').Theme;
 				}
 			}
 
