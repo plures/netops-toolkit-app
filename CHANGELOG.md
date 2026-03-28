@@ -1,3 +1,7 @@
+## [0.12.3] — 2026-03-28
+
+- fix: remove setup-python from tauri beforeDevCommand (c2d72d5)
+
 ## [0.12.2] — 2026-03-28
 
 - fix: add Deserialize to all structs, fix string escapes, fix borrow checker (e0d9013)
