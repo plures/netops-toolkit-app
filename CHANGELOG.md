@@ -1,3 +1,7 @@
+## [0.10.0] — 2026-03-28
+
+- feat: partition-based licensing system (replaces device-count model) (19311e2)
+
 ## [0.9.1] — 2026-03-28
 
 - fix: replace local design-dojo shim with real @plures/design-dojo (4d888c7)
