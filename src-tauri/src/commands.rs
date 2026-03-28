@@ -2085,6 +2085,15 @@ fn mock_playbook_templates() -> Vec<PlaybookTemplate> {
     ]
 }
 
+/// Escape a string value for safe embedding in a YAML double-quoted scalar.
+fn yaml_escape(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
 fn mock_generate_playbook(
     devices: &[String],
     template: &str,
@@ -2094,7 +2103,7 @@ fn mock_generate_playbook(
     let tmpl = templates.iter().find(|t| t.id == template);
     let tmpl_name = tmpl.map(|t| t.name.as_str()).unwrap_or(template);
 
-    // Build vars section
+    // Build vars section with safe YAML escaping
     let mut vars_section = String::new();
     if let Some(tmpl) = tmpl {
         for v in &tmpl.variables {
@@ -2104,19 +2113,22 @@ fn mock_generate_playbook(
                 .map(|s| s.as_str())
                 .unwrap_or(&v.default_value);
             if !val.is_empty() {
-                vars_section.push_str(&format!("    {}: \"{}\"\n", v.name, val));
+                vars_section.push_str(&format!(
+                    "    {}: \"{}\"\n",
+                    v.name,
+                    yaml_escape(val)
+                ));
             }
         }
     }
 
-    let hosts_list: String = devices
-        .iter()
-        .map(|d| format!("      - {d}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-
     let content = format!(
-        "---\n- name: {tmpl_name}\n  hosts: target_hosts\n  gather_facts: false\n  vars:\n{vars_section}\n  tasks:\n    - name: Execute {tmpl_name}\n      debug:\n        msg: \"Running {tmpl_name} on {{{{ inventory_hostname }}}}\"\n\n# Target hosts:\n{hosts_list}\n"
+        "---\n- name: {tmpl_name}\n  hosts: all\n  gather_facts: false\n{vars_block}  tasks:\n    - name: Execute {tmpl_name}\n      debug:\n        msg: \"Running {tmpl_name} on {{{{ inventory_hostname }}}}\"\n",
+        vars_block = if vars_section.is_empty() {
+            String::new()
+        } else {
+            format!("  vars:\n{vars_section}\n")
+        },
     );
 
     GeneratedPlaybook {

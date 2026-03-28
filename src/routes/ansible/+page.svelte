@@ -48,6 +48,28 @@
 	let templateVariables = $state<Record<string, string>>({});
 	let playbookPreview = $state<GeneratedPlaybook | null>(null);
 	let playbookLoading = $state(false);
+	let tuiTemplateIndex = $state(0);
+
+	// ── Load templates from backend on mount ─────────────────────────────────
+
+	let templatesLoaded = false;
+
+	async function loadTemplates(): Promise<void> {
+		try {
+			const { listPlaybookTemplates } = await import('$lib/services/ansible.js');
+			templates = await listPlaybookTemplates();
+		} catch (err) {
+			console.warn('Failed to load playbook templates, using mock data:', err);
+			templates = mockPlaybookTemplates;
+		}
+	}
+
+	$effect(() => {
+		if (!templatesLoaded) {
+			templatesLoaded = true;
+			loadTemplates();
+		}
+	});
 
 	// ── Derived ──────────────────────────────────────────────────────────────
 
@@ -148,6 +170,49 @@
 		}
 	}
 
+	// ── TUI keyboard handler ─────────────────────────────────────────────────
+
+	function handleTuiKeydown(e: KeyboardEvent): void {
+		if (!tui) return;
+
+		const key = e.key.toLowerCase();
+
+		// Tab switching
+		if (key === 'tab') {
+			e.preventDefault();
+			activeTab = activeTab === 'inventory' ? 'playbook' : 'inventory';
+			return;
+		}
+		if (key === '1') {
+			activeTab = 'inventory';
+			return;
+		}
+		if (key === '2') {
+			activeTab = 'playbook';
+			return;
+		}
+
+		if (activeTab === 'inventory') {
+			if (key === 'e') {
+				handleExportPreview();
+			} else if (key === 'f') {
+				inventoryFormat = inventoryFormat === 'yaml' ? 'json' : 'yaml';
+			}
+		} else {
+			if (key === 'a') {
+				handleSelectAllDevices();
+			} else if (key === 'g') {
+				handleGeneratePlaybook();
+			} else if (key === 't') {
+				// Cycle through templates
+				if (templates.length > 0) {
+					tuiTemplateIndex = (tuiTemplateIndex + 1) % templates.length;
+					handleTemplateChange(templates[tuiTemplateIndex].id);
+				}
+			}
+		}
+	}
+
 	const deviceColumns = [
 		{ key: 'name', label: 'Device', width: 16 },
 		{ key: 'host', label: 'IP', width: 14 },
@@ -159,7 +224,8 @@
 
 {#if tui}
 	<!-- ── TUI MODE ──────────────────────────────────────────────────────── -->
-	<div class="ansible-page tui">
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="ansible-page tui" tabindex="-1" onkeydown={handleTuiKeydown}>
 		<div class="header">
 			<span class="title">ANSIBLE INTEGRATION</span>
 			<span class="tabs">
@@ -205,7 +271,14 @@
 			</div>
 		{:else}
 			<div class="section">
-				<div class="section-header">Playbook Generator</div>
+				<div class="section-header">
+					Playbook Generator
+					{#if selectedTemplate}
+						— {selectedTemplate.name}
+					{:else}
+						— Press [T] to select template
+					{/if}
+				</div>
 				<Table
 					columns={deviceColumns}
 					rows={deviceRows}
@@ -219,7 +292,7 @@
 				{/if}
 			</div>
 			<div class="tui-actions">
-				<span>[Space] Select Device</span>
+				<span>[T] Cycle Template</span>
 				<span>[A] Select All</span>
 				<span>[G] Generate</span>
 				<span>[Tab] Switch Tab</span>
