@@ -15,7 +15,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "setup-python": "node scripts/setup-python.mjs"
+    "setup-python": "node scripts/setup-python.mjs",
+    "dev:tauri": "node scripts/setup-python.mjs && npm run dev",
+    "build:tauri": "node scripts/setup-python.mjs && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
