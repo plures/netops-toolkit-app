@@ -89,10 +89,14 @@
 		<!-- Tab bar -->
 		<div class="tab-bar">
 			{#each terminalStore.tabs as tab}
-				<button
+				<div
 					class="tab"
 					class:active={tab.id === terminalStore.activeTabId}
+					role="tab"
+					tabindex="0"
+					aria-selected={tab.id === terminalStore.activeTabId}
 					onclick={() => terminalStore.setActiveTab(tab.id)}
+					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') terminalStore.setActiveTab(tab.id); }}
 				>
 					<span class="tab-icon">{tab.type === 'ssh' ? '🔗' : '💻'}</span>
 					<span class="tab-label">{tab.label}</span>
@@ -101,10 +105,10 @@
 					</Badge>
 					<button
 						class="tab-close"
-						onclick|stopPropagation={() => terminalStore.closeTab(tab.id)}
+						onclick={(e: MouseEvent) => { e.stopPropagation(); terminalStore.closeTab(tab.id); }}
 						aria-label="Close tab"
 					>×</button>
-				</button>
+				</div>
 			{/each}
 			<div class="tab-new-container">
 				<button class="tab-new" onclick={() => { showNewMenu = !showNewMenu; }}>
