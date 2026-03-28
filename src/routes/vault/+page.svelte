@@ -234,7 +234,7 @@
 				scope: formScope,
 				target: formTarget.trim() || undefined,
 				username: formUsername.trim(),
-				password: formPassword,
+				password: formPassword || undefined,
 				enableSecret: formEnableSecret || undefined,
 				authMethod: formAuthMethod
 			};
