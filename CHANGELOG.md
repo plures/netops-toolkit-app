@@ -1,3 +1,7 @@
+## [0.9.0] — 2026-03-28
+
+- feat: Ansible integration — dynamic inventory export and playbook generation (#33) (b18f175)
+
 ## [0.8.2] — 2026-03-28
 
 - fix: add packages:write + id-token:write to release workflow (fa3b1e6)
