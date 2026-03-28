@@ -36,13 +36,7 @@
   },
   "plugins": {
     "shell": {
-      "open": false,
-      "scope": [
-        {
-          "name": "binaries/netops-scan",
-          "sidecar": true
-        }
-      ]
+      "open": false
     }
   }
 }
