@@ -112,6 +112,7 @@
 					<button
 						class="tab-close"
 						onclick={(e: MouseEvent) => { e.stopPropagation(); terminalStore.closeTab(tab.id); }}
+						onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); } }}
 						aria-label="Close tab"
 					>×</button>
 				</div>
