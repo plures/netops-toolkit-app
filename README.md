@@ -54,6 +54,11 @@ Real-time fleet monitoring: summary cards (healthy/warning/critical), top CPU an
 
 ![GUI Health](docs/screenshots/gui-health.svg)
 
+#### Credential Vault
+Encrypted credential store with scope-based resolution (device → group → default). Master password lock/unlock, add/edit/delete credentials, auth method selection (password/SSH key), enable secret support, and live resolution preview showing which credential matches a given hostname.
+
+![GUI Vault](docs/screenshots/gui-vault.svg)
+
 #### Settings
 SSH credentials, scan defaults (concurrency, timeout, deep scan), appearance (theme, status bar), and data management (export/import). All changes persisted locally.
 
@@ -90,6 +95,11 @@ Device health table with color-coded status, CPU/memory/temperature columns. Int
 
 ![TUI Health](docs/screenshots/tui-health.svg)
 
+#### Credential Vault
+Credential table with scope badges, resolution preview with hierarchy chain display. Keyboard-driven add/edit/delete/lock. Shows full resolution chain (device → group → default) for any hostname.
+
+![TUI Vault](docs/screenshots/tui-vault.svg)
+
 ---
 
 ## Architecture
@@ -121,6 +131,7 @@ Device health table with color-coded status, CPU/memory/temperature columns. Int
 | **Config Browser** | Version history, content viewer | ✅ | ✅ |
 | **Config Diff** | Unified diff with rollback support | ✅ | ✅ |
 | **Fleet Health** | CPU/memory/temp monitoring, interface errors, log alerts | ✅ | ✅ |
+| **Credential Vault** | Encrypted credential store, scope-based resolution, lock/unlock | ✅ | ✅ |
 | **Settings** | SSH creds, scan defaults, appearance, data management | ✅ | ✅ |
 
 ## Stack
