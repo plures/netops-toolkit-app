@@ -8,3 +8,6 @@ src-tauri/gen/
 dist/
 .env
 coverage/
+
+# Python backend (cloned at build time)
+.python-deps/
