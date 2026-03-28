@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 description = "Network operations toolkit desktop application"
 authors = ["Plures"]
-license = "AGPL-3.0"
+license = "BSL-1.1"
+license-file = "../LICENSE"
 
 [lib]
 name = "netops_toolkit_app_lib"

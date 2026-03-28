@@ -1,5 +1,7 @@
 # netops-toolkit-app
 
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE)
+
 Network operations TUI/GUI built with **Svelte 5 + Tauri 2 + design-dojo**.
 
 Desktop and terminal interface for [netops-toolkit](https://github.com/plures/netops-toolkit).
@@ -155,4 +157,8 @@ npm test             # Run tests
 
 ## License
 
-AGPL-3.0
+This project is licensed under the [Business Source License 1.1](LICENSE).
+
+- **Personal / non-commercial use**: Free, always
+- **Commercial use**: Requires a valid license key ([tiers & pricing](docs/admin-guide.md))
+- **Change date**: March 28, 2030 — this version becomes Apache 2.0
