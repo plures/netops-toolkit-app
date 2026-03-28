@@ -154,7 +154,7 @@
 					</select>
 				</label>
 				<Button
-					variant="primary"
+					variant="solid"
 					onclick={loadDiff}
 					disabled={loading || !selectedHostname || !selectedVersionA || !selectedVersionB}
 				>
@@ -165,7 +165,7 @@
 
 		{#if error}
 			<div class="error-banner">
-				<Badge variant="error">{error}</Badge>
+				<Badge variant="danger">{error}</Badge>
 			</div>
 		{/if}
 
@@ -174,7 +174,7 @@
 				<Pane flex={1} title="Diff: {diffResult.versionA} → {diffResult.versionB}" scrollable>
 					<div class="diff-stats">
 						<Badge variant="success" size="sm">+{diffResult.additions}</Badge>
-						<Badge variant="error" size="sm">-{diffResult.deletions}</Badge>
+						<Badge variant="danger" size="sm">-{diffResult.deletions}</Badge>
 					</div>
 					<pre class="diff-viewer">{#each diffLines as line}<span class="diff-line {line.type}">{line.text}</span>
 {/each}</pre>

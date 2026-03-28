@@ -154,7 +154,7 @@
 				{#if errorMsg}<p class="error-msg">{errorMsg}</p>{/if}
 				{#if successMsg}<p class="success-msg">{successMsg}</p>{/if}
 				<div class="form-actions">
-					<Button variant="primary" onclick={handleActivate}>Activate License</Button>
+					<Button variant="solid" onclick={handleActivate}>Activate License</Button>
 				</div>
 				<p class="purchase-link">
 					Don't have a key? <a href="https://plures.io/pricing" target="_blank" rel="noopener">Purchase at plures.io/pricing</a>

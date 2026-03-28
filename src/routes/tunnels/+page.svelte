@@ -134,12 +134,12 @@
 		if (profile) openEditForm(profile);
 	}
 
-	function statusVariant(status: string): 'success' | 'warning' | 'error' | 'neutral' {
+	function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
 		switch (status) {
 			case 'connected': return 'success';
 			case 'connecting':
 			case 'reconnecting': return 'warning';
-			case 'error': return 'error';
+			case 'error': return 'danger';
 			default: return 'neutral';
 		}
 	}
@@ -237,7 +237,7 @@
 				</Badge>
 			</div>
 			<div class="toolbar-actions">
-				<Button variant="primary" onclick={openAddForm}>＋ Add Tunnel</Button>
+				<Button variant="solid" onclick={openAddForm}>＋ Add Tunnel</Button>
 			</div>
 		</div>
 
@@ -305,8 +305,8 @@
 
 				{#if errorMsg}<p class="error-msg">{errorMsg}</p>{/if}
 				<div class="form-actions">
-					<Button variant="primary" onclick={handleSave}>{editingId ? 'Update' : 'Create Tunnel'}</Button>
-					<Button variant="secondary" onclick={() => { view = 'list'; }}>Cancel</Button>
+					<Button variant="solid" onclick={handleSave}>{editingId ? 'Update' : 'Create Tunnel'}</Button>
+					<Button variant="outline" onclick={() => { view = 'list'; }}>Cancel</Button>
 				</div>
 			</div>
 
@@ -347,7 +347,7 @@
 
 						<div class="tunnel-actions">
 							{#if state?.status === 'disconnected'}
-								<Button variant="primary" onclick={() => tunnelStore.connect(profile.id)}>
+								<Button variant="solid" onclick={() => tunnelStore.connect(profile.id)}>
 									▶ Connect
 								</Button>
 							{:else if state?.status === 'connected'}

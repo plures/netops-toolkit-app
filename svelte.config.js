@@ -14,9 +14,7 @@ const config = {
 			precompress: false,
 			strict: true
 		}),
-		alias: {
-			'@plures/design-dojo': './src/lib/design-dojo'
-		}
+		alias: {}
 	}
 };
 

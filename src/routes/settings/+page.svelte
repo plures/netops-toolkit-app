@@ -217,10 +217,10 @@
 						<Badge variant="warning" size="sm">Modified</Badge>
 					{/if}
 					{#if yamlSettingsStore.parseError}
-						<Badge variant="error" size="sm">Parse Error</Badge>
+						<Badge variant="danger" size="sm">Parse Error</Badge>
 					{/if}
 					<div class="yaml-actions">
-						<Button variant="primary" onclick={handleYamlApply} disabled={!yamlSettingsStore.dirty}>
+						<Button variant="solid" onclick={handleYamlApply} disabled={!yamlSettingsStore.dirty}>
 							Apply Changes
 						</Button>
 					</div>

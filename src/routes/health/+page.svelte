@@ -114,17 +114,17 @@
 	// --- Helpers ---
 	function statusVariant(
 		status: DeviceHealthEntry['status']
-	): 'success' | 'warning' | 'error' | 'neutral' {
+	): 'success' | 'warning' | 'danger' | 'neutral' {
 		if (status === 'healthy') return 'success';
 		if (status === 'warning') return 'warning';
-		if (status === 'critical') return 'error';
+		if (status === 'critical') return 'danger';
 		return 'neutral';
 	}
 
 	function severityVariant(
 		severity: string
-	): 'error' | 'warning' | 'info' | 'neutral' {
-		if (severity === 'critical' || severity === 'major') return 'error';
+	): 'danger' | 'warning' | 'info' | 'neutral' {
+		if (severity === 'critical' || severity === 'major') return 'danger';
 		if (severity === 'warning' || severity === 'minor') return 'warning';
 		if (severity === 'info') return 'info';
 		return 'neutral';
@@ -214,7 +214,7 @@
 	<div class="toolbar" role="toolbar" aria-label="Health dashboard controls">
 		<h2 class="page-title">Health Dashboard</h2>
 		<div class="toolbar-actions">
-			<Button variant="primary" size="sm" tui={getTui()} onclick={refreshData} disabled={loading}>
+			<Button variant="solid" size="sm" tui={getTui()} onclick={refreshData} disabled={loading}>
 				{loading ? 'Refreshing…' : '🔄 Refresh'}
 			</Button>
 			<Button

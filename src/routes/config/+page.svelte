@@ -127,10 +127,10 @@
 					onSelect={handleSearchSelect}
 					cols={30}
 				/>
-				<Button variant="primary" onclick={handleCollectAll} disabled={loading}>
+				<Button variant="solid" onclick={handleCollectAll} disabled={loading}>
 					{loading ? 'Collecting…' : '📥 Collect All'}
 				</Button>
-				<Button variant="secondary" onclick={() => goto('/config/diff')}>
+				<Button variant="outline" onclick={() => goto('/config/diff')}>
 					📊 Diff Viewer
 				</Button>
 			</div>

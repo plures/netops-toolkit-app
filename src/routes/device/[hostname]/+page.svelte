@@ -334,7 +334,7 @@
 		<StatusBar tui={isTui} position="bottom">
 			<StatusBarItem label="Device" value={data.hostname} />
 			<StatusBarItem label="Model" value={detail.systemInfo.model} separator />
-			<StatusBarSpacer tui={isTui} />
+			<StatusBarSpacer />
 			<StatusBarItem label="Version" value={detail.systemInfo.version} color="accent" />
 		</StatusBar>
 	{/if}

@@ -30,6 +30,7 @@
     "vite": "^6.0.0"
   },
   "dependencies": {
+    "@plures/design-dojo": "^0.10.17",
     "@tauri-apps/api": "^2.0.0"
   },
   "license": "UNLICENSED",

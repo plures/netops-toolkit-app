@@ -157,7 +157,7 @@
 						onkeydown={(e) => { if (e.key === 'Enter') handleSendCommand(); }}
 						aria-label="Terminal command input"
 					/>
-					<Button variant="primary" onclick={handleSendCommand}>Send</Button>
+					<Button variant="solid" onclick={handleSendCommand}>Send</Button>
 				</div>
 			{:else}
 				<div class="no-terminal">

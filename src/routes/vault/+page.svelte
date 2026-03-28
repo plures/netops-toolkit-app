@@ -734,7 +734,7 @@
 						{#if errorMsg}<p class="error-msg" role="alert">{errorMsg}</p>{/if}
 
 						<div class="lock-actions">
-							<Button variant="primary" onclick={handleInit} disabled={loading}>
+							<Button variant="solid" onclick={handleInit} disabled={loading}>
 								{loading ? 'Creating…' : 'Create Vault'}
 							</Button>
 							<Button
@@ -782,7 +782,7 @@
 						{#if errorMsg}<p class="error-msg" role="alert">{errorMsg}</p>{/if}
 
 						<div class="lock-actions">
-							<Button variant="primary" onclick={handleUnlock} disabled={loading}>
+							<Button variant="solid" onclick={handleUnlock} disabled={loading}>
 								{loading ? 'Unlocking…' : 'Unlock'}
 							</Button>
 							<Button
@@ -811,9 +811,9 @@
 						onSelect={handleSearchSelect}
 						cols={28}
 					/>
-					<Button variant="primary" onclick={openAddForm}>＋ Add Credential</Button>
+					<Button variant="solid" onclick={openAddForm}>＋ Add Credential</Button>
 					<Button
-						variant="secondary"
+						variant="outline"
 						onclick={() => {
 							view = 'resolve';
 							resolveHostname = '';
@@ -991,11 +991,11 @@
 				{#if errorMsg}<p class="error-msg" role="alert">{errorMsg}</p>{/if}
 
 				<div class="form-actions">
-					<Button variant="primary" onclick={handleSaveCredential} disabled={loading}>
+					<Button variant="solid" onclick={handleSaveCredential} disabled={loading}>
 						{loading ? 'Saving…' : editingId ? 'Update' : 'Add Credential'}
 					</Button>
 					<Button
-						variant="secondary"
+						variant="outline"
 						onclick={() => {
 							view = 'list';
 							errorMsg = '';
@@ -1039,11 +1039,11 @@
 					</dl>
 				{/if}
 				<div class="form-actions">
-					<Button variant="primary" onclick={handleConfirmDelete} disabled={loading}>
+					<Button variant="solid" onclick={handleConfirmDelete} disabled={loading}>
 						{loading ? 'Deleting…' : 'Yes, Delete'}
 					</Button>
 					<Button
-						variant="secondary"
+						variant="outline"
 						onclick={() => {
 							view = 'list';
 							deletingId = null;
@@ -1089,7 +1089,7 @@
 							if (e.key === 'Enter') handleResolve();
 						}}
 					/>
-					<Button variant="primary" onclick={handleResolve} disabled={resolveLoading}>
+					<Button variant="solid" onclick={handleResolve} disabled={resolveLoading}>
 						{resolveLoading ? 'Resolving…' : 'Resolve'}
 					</Button>
 				</div>

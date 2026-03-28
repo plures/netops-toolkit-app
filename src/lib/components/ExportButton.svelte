@@ -66,7 +66,7 @@
 	</span>
 {:else}
 	<div class="export-wrapper">
-		<Button variant="secondary" onclick={handleExport} disabled={exporting}>
+		<Button variant="outline" onclick={handleExport} disabled={exporting}>
 			{exporting ? '⏳ Exporting…' : label}
 		</Button>
 		{#if lastResult}

@@ -149,10 +149,10 @@
 				<Badge variant="info" size="sm">{backups.length} versions</Badge>
 			</div>
 			<div class="toolbar-actions">
-				<Button variant="primary" onclick={handleBackup} disabled={collecting}>
+				<Button variant="solid" onclick={handleBackup} disabled={collecting}>
 					{collecting ? 'Collecting…' : '📥 Backup Now'}
 				</Button>
-				<Button variant="secondary" onclick={handleDiff} disabled={backups.length < 2}>
+				<Button variant="outline" onclick={handleDiff} disabled={backups.length < 2}>
 					📊 Diff Versions
 				</Button>
 			</div>
@@ -177,11 +177,11 @@
 						{:else if rollbackConfirm}
 							<div class="confirm-bar">
 								<span>Rollback to <strong>{rollbackTarget}</strong>?</span>
-								<Button variant="danger" size="sm" onclick={handleRollback}>Confirm Rollback</Button>
+								<Button variant="solid" size="sm" onclick={handleRollback}>Confirm Rollback</Button>
 								<Button variant="ghost" size="sm" onclick={() => (rollbackConfirm = false)}>Cancel</Button>
 							</div>
 						{:else}
-							<Button variant="danger" size="sm" onclick={() => (rollbackConfirm = true)}>
+							<Button variant="solid" size="sm" onclick={() => (rollbackConfirm = true)}>
 								🔄 Rollback to {rollbackTarget}
 							</Button>
 						{/if}
