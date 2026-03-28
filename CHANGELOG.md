@@ -1,3 +1,7 @@
+## [0.12.2] — 2026-03-28
+
+- fix: add Deserialize to all structs, fix string escapes, fix borrow checker (e0d9013)
+
 ## [0.12.1] — 2026-03-28
 
 - fix: add placeholder icons for Windows build (4f7d3cb)
