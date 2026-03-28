@@ -191,7 +191,7 @@ function createSimpleZip(files: Record<string, string>): Blob {
 	eocdView.setUint16(20, 0, true);
 	parts.push(eocd);
 
-	return new Blob(parts, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+	return new Blob(parts as BlobPart[], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
 /** CRC32 implementation for ZIP */
