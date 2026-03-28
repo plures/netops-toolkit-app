@@ -11,11 +11,15 @@
 	let { tui = false, children }: Props = $props();
 
 	const navItems = [
-		{ icon: '📊', label: 'Inventory', href: '/inventory' },
+		{ icon: '📊', label: 'Dashboard', href: '/' },
+		{ icon: '📦', label: 'Inventory', href: '/inventory' },
 		{ icon: '🔍', label: 'Scan', href: '/scan' },
 		{ icon: '🩺', label: 'Health', href: '/health' },
 		{ icon: '📋', label: 'Config', href: '/config' },
 		{ icon: '🔐', label: 'Vault', href: '/vault' },
+		{ icon: '🚇', label: 'Tunnels', href: '/tunnels' },
+		{ icon: '💻', label: 'Terminal', href: '/terminal' },
+		{ icon: '🪪', label: 'License', href: '/license' },
 		{ icon: '⚙️', label: 'Settings', href: '/settings' }
 	] as const;
 
