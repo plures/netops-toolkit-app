@@ -15,6 +15,7 @@
 		{ icon: '🔍', label: 'Scan', href: '/scan' },
 		{ icon: '🩺', label: 'Health', href: '/health' },
 		{ icon: '📋', label: 'Config', href: '/config' },
+		{ icon: '🔐', label: 'Vault', href: '/vault' },
 		{ icon: '⚙️', label: 'Settings', href: '/settings' }
 	] as const;
 
