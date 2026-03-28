@@ -1294,28 +1294,52 @@ pub async fn vault_unlock(password: String) -> Result<VaultStatus, String> {
         .stderr(std::process::Stdio::piped())
         .spawn();
 
-    if let Ok(mut child) = output {
-        use tokio::io::AsyncWriteExt;
-        if let Some(stdin) = child.stdin.take() {
-            let mut stdin = tokio::io::BufWriter::new(stdin);
-            let _ = stdin.write_all(password.as_bytes()).await;
-            let _ = stdin.flush().await;
+    match output {
+        Err(_spawn_err) => {
+            // Sidecar is unavailable (failed to spawn) — fall back to mock.
+            Ok(VaultStatus {
+                unlocked: true,
+                credential_count: 4,
+            })
         }
-        if let Ok(out) = child.wait_with_output().await {
-            if out.status.success() {
-                let text = String::from_utf8_lossy(&out.stdout);
-                if let Ok(status) = serde_json::from_str::<VaultStatus>(&text) {
-                    return Ok(status);
+        Ok(mut child) => {
+            use tokio::io::AsyncWriteExt;
+
+            // Best-effort: write password to stdin; if this fails, the child
+            // process will likely exit with an error which we handle below.
+            if let Some(stdin) = child.stdin.take() {
+                let mut stdin = tokio::io::BufWriter::new(stdin);
+                let _ = stdin.write_all(password.as_bytes()).await;
+                let _ = stdin.flush().await;
+            }
+
+            match child.wait_with_output().await {
+                Err(wait_err) => Err(format!(
+                    "Failed to wait for vault unlock process: {}",
+                    wait_err
+                )),
+                Ok(out) => {
+                    if out.status.success() {
+                        let text = String::from_utf8_lossy(&out.stdout);
+                        match serde_json::from_str::<VaultStatus>(&text) {
+                            Ok(status) => Ok(status),
+                            Err(_) => Err(
+                                "Failed to parse vault unlock response from sidecar".into(),
+                            ),
+                        }
+                    } else {
+                        // Non-zero exit: treat as a real error (e.g. wrong password).
+                        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                        if !stderr.is_empty() {
+                            Err(stderr)
+                        } else {
+                            Err("Vault unlock failed".into())
+                        }
+                    }
                 }
             }
         }
     }
-
-    // Mock: accept any non-empty password, pretend 4 credentials exist
-    Ok(VaultStatus {
-        unlocked: true,
-        credential_count: 4,
-    })
 }
 
 /// List all stored credentials (passwords are always masked).
