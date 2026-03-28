@@ -1630,3 +1630,502 @@ fn mock_vault_resolve(hostname: &str) -> VaultResolveResult {
         explanation: format!("No credential found for \"{hostname}\"."),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Ansible payload types
+// ---------------------------------------------------------------------------
+
+/// Filter to narrow which devices appear in the exported inventory.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct InventoryFilter {
+    pub vendor: Option<String>,
+    pub site: Option<String>,
+    pub hostnames: Option<Vec<String>>,
+}
+
+/// Ansible-compatible inventory export result.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AnsibleInventory {
+    pub format: String,
+    pub content: String,
+    pub group_count: u32,
+    pub host_count: u32,
+}
+
+/// A variable within a playbook template.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateVariable {
+    pub name: String,
+    pub description: String,
+    pub default_value: String,
+    pub required: bool,
+}
+
+/// A playbook template available for generation.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybookTemplate {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub variables: Vec<TemplateVariable>,
+}
+
+/// Generated playbook result.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneratedPlaybook {
+    pub name: String,
+    pub content: String,
+    pub device_count: u32,
+    pub template: String,
+}
+
+// ---------------------------------------------------------------------------
+// Ansible commands
+// ---------------------------------------------------------------------------
+
+/// Export an Ansible-compatible inventory from scanned devices.
+///
+/// Calls `python3 -m netops.ansible.dynamic_inventory`.
+/// Falls back to mock inventory when the sidecar is unavailable.
+#[tauri::command]
+pub async fn export_ansible_inventory(
+    format: String,
+    filter: Option<InventoryFilter>,
+) -> Result<AnsibleInventory, String> {
+    let fmt_arg = match format.as_str() {
+        "json" => "json",
+        _ => "yaml",
+    };
+
+    let mut args = vec![
+        "-m".to_string(),
+        "netops.ansible.dynamic_inventory".to_string(),
+        "--format".to_string(),
+        fmt_arg.to_string(),
+    ];
+
+    if let Some(ref f) = filter {
+        if let Some(ref vendor) = f.vendor {
+            args.push("--vendor".into());
+            args.push(vendor.clone());
+        }
+        if let Some(ref site) = f.site {
+            args.push("--site".into());
+            args.push(site.clone());
+        }
+        if let Some(ref hostnames) = f.hostnames {
+            for h in hostnames {
+                args.push("--host".into());
+                args.push(h.clone());
+            }
+        }
+    }
+
+    let output = Command::new("python3")
+        .args(&args)
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(inv) = serde_json::from_str::<AnsibleInventory>(&text) {
+                return Ok(inv);
+            }
+        }
+    }
+
+    Ok(mock_ansible_inventory(&format, &filter))
+}
+
+/// Generate an Ansible playbook from a template and device list.
+///
+/// Calls `python3 -m netops.playbooks.generator`.
+/// Falls back to mock playbook when the sidecar is unavailable.
+#[tauri::command]
+pub async fn generate_playbook(
+    devices: Vec<String>,
+    template: String,
+    variables: Option<std::collections::HashMap<String, String>>,
+) -> Result<GeneratedPlaybook, String> {
+    if devices.is_empty() {
+        return Err("At least one device must be selected".into());
+    }
+
+    let mut args = vec![
+        "-m".to_string(),
+        "netops.playbooks.generator".to_string(),
+        "--template".to_string(),
+        template.clone(),
+        "--format".to_string(),
+        "json".to_string(),
+    ];
+
+    for d in &devices {
+        args.push("--device".into());
+        args.push(d.clone());
+    }
+
+    if let Some(ref vars) = variables {
+        for (k, v) in vars {
+            args.push("--var".into());
+            args.push(format!("{k}={v}"));
+        }
+    }
+
+    let output = Command::new("python3")
+        .args(&args)
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(pb) = serde_json::from_str::<GeneratedPlaybook>(&text) {
+                return Ok(pb);
+            }
+        }
+    }
+
+    Ok(mock_generate_playbook(&devices, &template, &variables))
+}
+
+/// List available playbook templates.
+///
+/// Calls `python3 -m netops.playbooks.generator --list-templates`.
+/// Falls back to mock templates when the sidecar is unavailable.
+#[tauri::command]
+pub async fn list_playbook_templates() -> Result<Vec<PlaybookTemplate>, String> {
+    let output = Command::new("python3")
+        .args([
+            "-m",
+            "netops.playbooks.generator",
+            "--list-templates",
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(templates) = serde_json::from_str::<Vec<PlaybookTemplate>>(&text) {
+                return Ok(templates);
+            }
+        }
+    }
+
+    Ok(mock_playbook_templates())
+}
+
+// ---------------------------------------------------------------------------
+// Ansible mock helpers
+// ---------------------------------------------------------------------------
+
+/// Device entry used for building mock inventory data.
+struct MockDevice {
+    hostname: &'static str,
+    ip: &'static str,
+    vendor: &'static str,
+    model: &'static str,
+    serial: &'static str,
+    site: &'static str,
+    network_os: &'static str,
+}
+
+fn mock_device_list() -> Vec<MockDevice> {
+    vec![
+        MockDevice { hostname: "core-rtr-01", ip: "10.0.0.1", vendor: "cisco_ios", model: "ASR1001-X", serial: "FXS2208Q1GD", site: "NYC-DC1", network_os: "ios" },
+        MockDevice { hostname: "core-rtr-02", ip: "10.0.0.2", vendor: "cisco_ios", model: "ASR1001-X", serial: "FXS2208Q1GE", site: "NYC-DC1", network_os: "ios" },
+        MockDevice { hostname: "edge-rtr-01", ip: "10.0.1.1", vendor: "nokia_sros", model: "7750 SR-12", serial: "NS22010001", site: "NYC-DC1", network_os: "sros" },
+        MockDevice { hostname: "edge-rtr-02", ip: "10.0.1.2", vendor: "nokia_sros", model: "7750 SR-12", serial: "NS22010002", site: "LON-DC2", network_os: "sros" },
+        MockDevice { hostname: "spine-sw-01", ip: "10.1.0.1", vendor: "arista_eos", model: "DCS-7050CX3-32S", serial: "HSH21270001", site: "NYC-DC1", network_os: "eos" },
+        MockDevice { hostname: "spine-sw-02", ip: "10.1.0.2", vendor: "arista_eos", model: "DCS-7050CX3-32S", serial: "HSH21270002", site: "LON-DC2", network_os: "eos" },
+        MockDevice { hostname: "leaf-sw-01", ip: "10.1.1.1", vendor: "arista_eos", model: "DCS-7020R-48S2-R", serial: "HSH20100011", site: "NYC-DC1", network_os: "eos" },
+        MockDevice { hostname: "leaf-sw-02", ip: "10.1.1.2", vendor: "arista_eos", model: "DCS-7020R-48S2-R", serial: "HSH20100012", site: "NYC-DC1", network_os: "eos" },
+        MockDevice { hostname: "agg-rtr-01", ip: "10.0.2.1", vendor: "cisco_ios", model: "ISR4451", serial: "FGL2404AA4B", site: "SYD-DC3", network_os: "ios" },
+        MockDevice { hostname: "agg-rtr-02", ip: "10.0.2.2", vendor: "cisco_ios", model: "ISR4451", serial: "FGL2404AA4C", site: "SYD-DC3", network_os: "ios" },
+        MockDevice { hostname: "pe-rtr-01", ip: "10.0.3.1", vendor: "nokia_sros", model: "7210 SAS-T", serial: "NS21070003", site: "LON-DC2", network_os: "sros" },
+        MockDevice { hostname: "pe-rtr-02", ip: "10.0.3.2", vendor: "nokia_sros", model: "7210 SAS-T", serial: "NS21070004", site: "SYD-DC3", network_os: "sros" },
+        MockDevice { hostname: "border-sw-01", ip: "10.1.2.1", vendor: "arista_eos", model: "DCS-7280CR3-32P4", serial: "HSH22010013", site: "NYC-DC1", network_os: "eos" },
+        MockDevice { hostname: "dist-rtr-01", ip: "10.0.4.1", vendor: "cisco_ios", model: "Catalyst 9300", serial: "FCW2319Y0J2", site: "SYD-DC3", network_os: "ios" },
+        MockDevice { hostname: "wan-rtr-01", ip: "10.0.5.1", vendor: "nokia_sros", model: "7705 SAR-8", serial: "NS20100005", site: "LON-DC2", network_os: "sros" },
+    ]
+}
+
+fn mock_ansible_inventory(format: &str, filter: &Option<InventoryFilter>) -> AnsibleInventory {
+    let all_devices = mock_device_list();
+
+    let devices: Vec<&MockDevice> = all_devices
+        .iter()
+        .filter(|d| {
+            if let Some(ref f) = filter {
+                if let Some(ref vendor) = f.vendor {
+                    if d.vendor != vendor.as_str() {
+                        return false;
+                    }
+                }
+                if let Some(ref site) = f.site {
+                    if d.site != site.as_str() {
+                        return false;
+                    }
+                }
+                if let Some(ref hostnames) = f.hostnames {
+                    if !hostnames.iter().any(|h| h == d.hostname) {
+                        return false;
+                    }
+                }
+            }
+            true
+        })
+        .collect();
+
+    // Group by vendor
+    let mut groups: std::collections::HashMap<&str, Vec<&MockDevice>> =
+        std::collections::HashMap::new();
+    for d in &devices {
+        groups.entry(d.vendor).or_default().push(d);
+    }
+
+    let host_count = devices.len() as u32;
+    let group_count = groups.len() as u32;
+
+    let content = if format == "json" {
+        build_inventory_json(&groups)
+    } else {
+        build_inventory_yaml(&groups)
+    };
+
+    AnsibleInventory {
+        format: format.to_string(),
+        content,
+        group_count,
+        host_count,
+    }
+}
+
+fn build_inventory_yaml(
+    groups: &std::collections::HashMap<&str, Vec<&MockDevice>>,
+) -> String {
+    let mut out = String::from("all:\n  children:\n");
+    let mut sorted_groups: Vec<_> = groups.iter().collect();
+    sorted_groups.sort_by_key(|(k, _)| *k);
+
+    for (vendor, devs) in sorted_groups {
+        let network_os = devs.first().map(|d| d.network_os).unwrap_or("unknown");
+        out.push_str(&format!("    {vendor}:\n      hosts:\n"));
+        for d in devs {
+            out.push_str(&format!(
+                "        {}:\n          ansible_host: {}\n          model: {}\n          serial: {}\n          site: {}\n",
+                d.hostname, d.ip, d.model, d.serial, d.site
+            ));
+        }
+        out.push_str(&format!(
+            "      vars:\n        ansible_network_os: {network_os}\n        ansible_connection: network_cli\n"
+        ));
+    }
+    out
+}
+
+fn build_inventory_json(
+    groups: &std::collections::HashMap<&str, Vec<&MockDevice>>,
+) -> String {
+    use serde_json::{json, Map, Value};
+
+    let mut children = Map::new();
+    let mut sorted_groups: Vec<_> = groups.iter().collect();
+    sorted_groups.sort_by_key(|(k, _)| *k);
+
+    for (vendor, devs) in sorted_groups {
+        let network_os = devs.first().map(|d| d.network_os).unwrap_or("unknown");
+        let mut hosts = Map::new();
+        for d in devs {
+            hosts.insert(
+                d.hostname.to_string(),
+                json!({
+                    "ansible_host": d.ip,
+                    "model": d.model,
+                    "serial": d.serial,
+                    "site": d.site,
+                }),
+            );
+        }
+        children.insert(
+            vendor.to_string(),
+            json!({
+                "hosts": Value::Object(hosts),
+                "vars": {
+                    "ansible_network_os": network_os,
+                    "ansible_connection": "network_cli",
+                },
+            }),
+        );
+    }
+
+    let inventory = json!({ "all": { "children": Value::Object(children) } });
+    serde_json::to_string_pretty(&inventory).unwrap_or_default()
+}
+
+fn mock_playbook_templates() -> Vec<PlaybookTemplate> {
+    vec![
+        PlaybookTemplate {
+            id: "backup-config".into(),
+            name: "Backup Configuration".into(),
+            description: "Collect running configuration from target devices and store locally."
+                .into(),
+            variables: vec![
+                TemplateVariable {
+                    name: "backup_dir".into(),
+                    description: "Local directory to store backups".into(),
+                    default_value: "./backups".into(),
+                    required: true,
+                },
+                TemplateVariable {
+                    name: "timestamp_format".into(),
+                    description: "Timestamp format for backup filenames".into(),
+                    default_value: "%Y%m%d_%H%M%S".into(),
+                    required: false,
+                },
+            ],
+        },
+        PlaybookTemplate {
+            id: "health-check".into(),
+            name: "Health Check".into(),
+            description:
+                "Run health checks across selected devices — CPU, memory, interface errors."
+                    .into(),
+            variables: vec![
+                TemplateVariable {
+                    name: "cpu_threshold".into(),
+                    description: "CPU usage warning threshold (%)".into(),
+                    default_value: "80".into(),
+                    required: false,
+                },
+                TemplateVariable {
+                    name: "memory_threshold".into(),
+                    description: "Memory usage warning threshold (%)".into(),
+                    default_value: "85".into(),
+                    required: false,
+                },
+            ],
+        },
+        PlaybookTemplate {
+            id: "firmware-upgrade".into(),
+            name: "Firmware Upgrade".into(),
+            description:
+                "Stage and activate firmware on target devices with pre/post checks.".into(),
+            variables: vec![
+                TemplateVariable {
+                    name: "firmware_image".into(),
+                    description: "Path or URL to firmware image".into(),
+                    default_value: String::new(),
+                    required: true,
+                },
+                TemplateVariable {
+                    name: "reboot_wait".into(),
+                    description: "Seconds to wait for device reboot".into(),
+                    default_value: "300".into(),
+                    required: false,
+                },
+                TemplateVariable {
+                    name: "pre_check".into(),
+                    description: "Run pre-upgrade health check".into(),
+                    default_value: "true".into(),
+                    required: false,
+                },
+            ],
+        },
+        PlaybookTemplate {
+            id: "ntp-config".into(),
+            name: "Configure NTP".into(),
+            description: "Deploy NTP server configuration to selected devices.".into(),
+            variables: vec![
+                TemplateVariable {
+                    name: "ntp_server_1".into(),
+                    description: "Primary NTP server address".into(),
+                    default_value: "10.0.0.100".into(),
+                    required: true,
+                },
+                TemplateVariable {
+                    name: "ntp_server_2".into(),
+                    description: "Secondary NTP server address".into(),
+                    default_value: "10.0.0.101".into(),
+                    required: false,
+                },
+            ],
+        },
+        PlaybookTemplate {
+            id: "snmp-config".into(),
+            name: "Configure SNMP".into(),
+            description: "Deploy SNMP v2c/v3 community and trap configuration.".into(),
+            variables: vec![
+                TemplateVariable {
+                    name: "snmp_community".into(),
+                    description: "SNMP community string".into(),
+                    default_value: "public".into(),
+                    required: true,
+                },
+                TemplateVariable {
+                    name: "trap_server".into(),
+                    description: "SNMP trap destination".into(),
+                    default_value: "10.0.0.200".into(),
+                    required: true,
+                },
+                TemplateVariable {
+                    name: "snmp_version".into(),
+                    description: "SNMP version (2c or 3)".into(),
+                    default_value: "2c".into(),
+                    required: false,
+                },
+            ],
+        },
+    ]
+}
+
+fn mock_generate_playbook(
+    devices: &[String],
+    template: &str,
+    variables: &Option<std::collections::HashMap<String, String>>,
+) -> GeneratedPlaybook {
+    let templates = mock_playbook_templates();
+    let tmpl = templates.iter().find(|t| t.id == template);
+    let tmpl_name = tmpl.map(|t| t.name.as_str()).unwrap_or(template);
+
+    // Build vars section
+    let mut vars_section = String::new();
+    if let Some(tmpl) = tmpl {
+        for v in &tmpl.variables {
+            let val = variables
+                .as_ref()
+                .and_then(|vs| vs.get(&v.name))
+                .map(|s| s.as_str())
+                .unwrap_or(&v.default_value);
+            if !val.is_empty() {
+                vars_section.push_str(&format!("    {}: \"{}\"\n", v.name, val));
+            }
+        }
+    }
+
+    let hosts_list: String = devices
+        .iter()
+        .map(|d| format!("      - {d}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let content = format!(
+        "---\n- name: {tmpl_name}\n  hosts: target_hosts\n  gather_facts: false\n  vars:\n{vars_section}\n  tasks:\n    - name: Execute {tmpl_name}\n      debug:\n        msg: \"Running {tmpl_name} on {{{{ inventory_hostname }}}}\"\n\n# Target hosts:\n{hosts_list}\n"
+    );
+
+    GeneratedPlaybook {
+        name: format!("{template}-playbook.yml"),
+        content,
+        device_count: devices.len() as u32,
+        template: template.to_string(),
+    }
+}

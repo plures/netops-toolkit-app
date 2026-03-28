@@ -30,6 +30,9 @@ pub fn run() {
             commands::vault_set,
             commands::vault_delete,
             commands::vault_resolve,
+            commands::export_ansible_inventory,
+            commands::generate_playbook,
+            commands::list_playbook_templates,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]
