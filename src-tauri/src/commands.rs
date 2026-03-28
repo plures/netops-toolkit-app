@@ -1353,16 +1353,26 @@ pub async fn vault_list() -> Result<Vec<VaultCredential>, String> {
         .output()
         .await;
 
-    if let Ok(out) = output {
-        if out.status.success() {
-            let text = String::from_utf8_lossy(&out.stdout);
-            if let Ok(creds) = serde_json::from_str::<Vec<VaultCredential>>(&text) {
-                return Ok(creds);
+    match output {
+        Ok(out) => {
+            if !out.status.success() {
+                let status = out
+                    .status
+                    .code()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "terminated by signal".to_string());
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                return Err(format!("vault_list failed with status {status}: {stderr}"));
             }
-        }
-    }
 
-    Ok(mock_vault_credentials())
+            let text = String::from_utf8_lossy(&out.stdout);
+            let creds = serde_json::from_str::<Vec<VaultCredential>>(&text)
+                .map_err(|e| format!("Failed to parse vault list output: {e}"))?;
+            Ok(creds)
+        }
+        // Fall back to mock data only when the sidecar cannot be spawned/executed
+        Err(_) => Ok(mock_vault_credentials()),
+    }
 }
 
 /// Create or update a credential in the vault.
