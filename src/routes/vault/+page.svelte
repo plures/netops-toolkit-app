@@ -66,7 +66,8 @@
 	}
 
 	async function handleInit(): Promise<void> {
-		if (masterPassword.length < 8) {
+		const masterPasswordLength = Array.from(masterPassword).length;
+		if (masterPasswordLength < 8) {
 			errorMsg = 'Password must be at least 8 characters.';
 			return;
 		}
