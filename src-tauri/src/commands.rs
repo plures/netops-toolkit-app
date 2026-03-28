@@ -406,7 +406,7 @@ pub async fn load_inventory(path: String) -> Result<Vec<serde_json::Value>, Stri
 // Device detail payload types
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SystemInfo {
     pub hostname: String,
     pub ip: String,
@@ -417,7 +417,7 @@ pub struct SystemInfo {
     pub uptime: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InterfaceEntry {
     pub name: String,
     pub status: String,
@@ -427,14 +427,14 @@ pub struct InterfaceEntry {
     pub utilization: f32,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HealthInfo {
     pub cpu_percent: f32,
     pub memory_percent: f32,
     pub temperature_celsius: Option<f32>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BgpPeer {
     pub neighbor: String,
     pub remote_as: u32,
@@ -442,7 +442,7 @@ pub struct BgpPeer {
     pub prefixes_received: u32,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceDetail {
     pub system_info: SystemInfo,
     pub interfaces: Vec<InterfaceEntry>,
@@ -605,7 +605,7 @@ fn mock_health(_hostname: &str) -> HealthInfo {
 // Fleet health payload types & command
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InterfaceErrorEntry {
     pub interface_name: String,
     pub crc_errors: u64,
@@ -613,7 +613,7 @@ pub struct InterfaceErrorEntry {
     pub output_errors: u64,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LogAlertEntry {
     pub timestamp: String,
     pub severity: String,
@@ -1107,16 +1107,16 @@ fn mock_diff(hostname: &str, version_a: &str, version_b: &str) -> DiffResult {
         unified: format!(
             "--- {hostname} {version_a}\n\
              +++ {hostname} {version_b}\n\
-             @@ -8,6 +8,9 @@\n\
-             \ ip address 10.0.0.1 255.255.255.0\n\
-             \ no shutdown\n\
+             @@ -8,6 +8,9 @@\n \
+             ip address 10.0.0.1 255.255.255.0\n \
+             no shutdown\n\
              !\n\
              +interface GigabitEthernet0/0/1\n\
              + ip address 10.0.1.1 255.255.255.0\n\
              + no shutdown\n\
              +!\n\
-             router bgp 65001\n\
-             \ neighbor 10.0.0.2 remote-as 65001\n"
+             router bgp 65001\n \
+             neighbor 10.0.0.2 remote-as 65001\n"
         ),
         additions: 4,
         deletions: 0,
