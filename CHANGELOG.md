@@ -1,3 +1,7 @@
+## [0.8.1] — 2026-03-28
+
+- fix: resolve TypeScript and Svelte 5 errors blocking CI (#32) (b4745d8)
+
 ## [0.8.0] — 2026-03-28
 
 - feat: add licensing, YAML settings, export, SSH tunnels, and terminal (ff14ebf)
