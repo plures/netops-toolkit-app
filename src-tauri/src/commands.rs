@@ -1319,11 +1319,15 @@ pub async fn vault_unlock(password: String) -> Result<VaultStatus, String> {
         }
         Ok(mut child) => {
             use tokio::io::AsyncWriteExt;
+
+            // Best-effort: write password to stdin; if this fails, the child
+            // process will likely exit with an error which we handle below.
             if let Some(stdin) = child.stdin.take() {
                 let mut stdin = tokio::io::BufWriter::new(stdin);
                 let _ = stdin.write_all(password.as_bytes()).await;
                 let _ = stdin.flush().await;
             }
+
             match child.wait_with_output().await {
                 Err(e) => Err(format!("Failed to wait for vault unlock process: {e}")),
                 Ok(out) => {
