@@ -1697,16 +1697,13 @@ pub async fn export_ansible_inventory(
     format: String,
     filter: Option<InventoryFilter>,
 ) -> Result<AnsibleInventory, String> {
-    let fmt_arg = match format.as_str() {
-        "json" => "json",
-        _ => "yaml",
-    };
-
+    // Always request JSON from the Python sidecar so we can reliably
+    // deserialize with serde_json, regardless of the requested output format.
     let mut args = vec![
         "-m".to_string(),
         "netops.ansible.dynamic_inventory".to_string(),
         "--format".to_string(),
-        fmt_arg.to_string(),
+        "json".to_string(),
     ];
 
     if let Some(ref f) = filter {
