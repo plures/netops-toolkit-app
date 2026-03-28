@@ -1,3 +1,9 @@
+## [0.8.0] — 2026-03-28
+
+- feat: add licensing, YAML settings, export, SSH tunnels, and terminal (ff14ebf)
+- docs: add credential vault screenshots (GUI + TUI) (7b204a1)
+- docs: add extensive screenshots for all views in GUI and TUI mode (494172d)
+
 ## [0.7.0] — 2026-03-28
 
 - feat: Credential Vault UI — encrypted credential management (#31) (3a4df80)
