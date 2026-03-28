@@ -1210,7 +1210,8 @@ pub struct VaultSetPayload {
     pub scope: CredentialScope,
     pub target: Option<String>,
     pub username: String,
-    pub password: String,
+    /// Omit (null/undefined) when editing to keep the existing password.
+    pub password: Option<String>,
     pub enable_secret: Option<String>,
     pub auth_method: AuthMethod,
 }
@@ -1239,119 +1240,158 @@ pub struct VaultResolveResult {
 /// Initialise the encrypted credential vault with a new master password.
 ///
 /// Calls `python3 -m netops.core.vault init`.
-/// Falls back to a mock response when the sidecar is unavailable.
+/// Falls back to a mock "vault created" response only when the sidecar cannot be spawned
+/// (i.e. netops-toolkit is not installed) so the UI remains usable in offline/dev mode.
 #[tauri::command]
 pub async fn vault_init(password: String) -> Result<VaultStatus, String> {
     if password.chars().count() < 8 {
         return Err("Master password must be at least 8 characters".into());
     }
 
-    let output = Command::new("python3")
+    let spawn_result = Command::new("python3")
         .args(["-m", "netops.core.vault", "init", "--format", "json"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn();
 
-    if let Ok(mut child) = output {
-        use tokio::io::AsyncWriteExt;
-        if let Some(stdin) = child.stdin.take() {
-            let mut stdin = tokio::io::BufWriter::new(stdin);
-            let _ = stdin.write_all(password.as_bytes()).await;
-            let _ = stdin.flush().await;
+    match spawn_result {
+        Err(_) => {
+            // Sidecar unavailable — fall back to mock so offline/dev mode works.
+            Ok(VaultStatus {
+                unlocked: true,
+                credential_count: 0,
+            })
         }
-        if let Ok(out) = child.wait_with_output().await {
-            if out.status.success() {
-                let text = String::from_utf8_lossy(&out.stdout);
-                if let Ok(status) = serde_json::from_str::<VaultStatus>(&text) {
-                    return Ok(status);
+        Ok(mut child) => {
+            use tokio::io::AsyncWriteExt;
+            if let Some(stdin) = child.stdin.take() {
+                let mut stdin = tokio::io::BufWriter::new(stdin);
+                let _ = stdin.write_all(password.as_bytes()).await;
+                let _ = stdin.flush().await;
+            }
+            match child.wait_with_output().await {
+                Err(e) => Err(format!("Failed to wait for vault init process: {e}")),
+                Ok(out) => {
+                    if out.status.success() {
+                        let text = String::from_utf8_lossy(&out.stdout);
+                        serde_json::from_str::<VaultStatus>(&text)
+                            .map_err(|_| "Failed to parse vault init response".into())
+                    } else {
+                        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                        Err(if stderr.is_empty() {
+                            "Vault init failed".into()
+                        } else {
+                            stderr
+                        })
+                    }
                 }
             }
         }
     }
-
-    // Mock: vault created with 0 credentials
-    Ok(VaultStatus {
-        unlocked: true,
-        credential_count: 0,
-    })
 }
 
 /// Unlock the vault using the master password; session-cached on success.
 ///
 /// Calls `python3 -m netops.core.vault unlock --format json`.
-/// Falls back to mock data when the sidecar is unavailable.
+/// Falls back to mock data only when the sidecar cannot be spawned; returns an error
+/// for all other failures (e.g. wrong password) so the frontend can surface them.
 #[tauri::command]
 pub async fn vault_unlock(password: String) -> Result<VaultStatus, String> {
     if password.is_empty() {
         return Err("Password must not be empty".into());
     }
 
-    let output = Command::new("python3")
+    let spawn_result = Command::new("python3")
         .args(["-m", "netops.core.vault", "unlock", "--format", "json"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn();
 
-    if let Ok(mut child) = output {
-        use tokio::io::AsyncWriteExt;
-        if let Some(stdin) = child.stdin.take() {
-            let mut stdin = tokio::io::BufWriter::new(stdin);
-            let _ = stdin.write_all(password.as_bytes()).await;
-            let _ = stdin.flush().await;
+    match spawn_result {
+        Err(_) => {
+            // Sidecar unavailable — fall back to mock so offline/dev mode works.
+            Ok(VaultStatus {
+                unlocked: true,
+                credential_count: 4,
+            })
         }
-        if let Ok(out) = child.wait_with_output().await {
-            if out.status.success() {
-                let text = String::from_utf8_lossy(&out.stdout);
-                if let Ok(status) = serde_json::from_str::<VaultStatus>(&text) {
-                    return Ok(status);
+        Ok(mut child) => {
+            use tokio::io::AsyncWriteExt;
+            if let Some(stdin) = child.stdin.take() {
+                let mut stdin = tokio::io::BufWriter::new(stdin);
+                let _ = stdin.write_all(password.as_bytes()).await;
+                let _ = stdin.flush().await;
+            }
+            match child.wait_with_output().await {
+                Err(e) => Err(format!("Failed to wait for vault unlock process: {e}")),
+                Ok(out) => {
+                    if out.status.success() {
+                        let text = String::from_utf8_lossy(&out.stdout);
+                        serde_json::from_str::<VaultStatus>(&text)
+                            .map_err(|_| "Failed to parse vault unlock response".into())
+                    } else {
+                        // Non-zero exit: real failure (e.g. wrong master password).
+                        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                        Err(if stderr.is_empty() {
+                            "Vault unlock failed".into()
+                        } else {
+                            stderr
+                        })
+                    }
                 }
             }
         }
     }
-
-    // Mock: accept any non-empty password, pretend 4 credentials exist
-    Ok(VaultStatus {
-        unlocked: true,
-        credential_count: 4,
-    })
 }
 
 /// List all stored credentials (passwords are always masked).
 ///
 /// Calls `python3 -m netops.core.vault list --format json`.
-/// Falls back to mock data when the sidecar is unavailable.
+/// Falls back to mock data only when the sidecar cannot be spawned.
 #[tauri::command]
 pub async fn vault_list() -> Result<Vec<VaultCredential>, String> {
-    let output = Command::new("python3")
+    match Command::new("python3")
         .args(["-m", "netops.core.vault", "list", "--format", "json"])
         .output()
-        .await;
-
-    if let Ok(out) = output {
-        if out.status.success() {
-            let text = String::from_utf8_lossy(&out.stdout);
-            if let Ok(creds) = serde_json::from_str::<Vec<VaultCredential>>(&text) {
-                return Ok(creds);
+        .await
+    {
+        Err(_) => {
+            // Sidecar unavailable — return mock data for offline/dev mode.
+            Ok(mock_vault_credentials())
+        }
+        Ok(out) => {
+            if out.status.success() {
+                let text = String::from_utf8_lossy(&out.stdout);
+                serde_json::from_str::<Vec<VaultCredential>>(&text)
+                    .map_err(|e| format!("Failed to parse vault list output: {e}"))
+            } else {
+                let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                Err(if stderr.is_empty() {
+                    "vault_list failed".into()
+                } else {
+                    stderr
+                })
             }
         }
     }
-
-    Ok(mock_vault_credentials())
 }
 
 /// Create or update a credential in the vault.
 ///
 /// Calls `python3 -m netops.core.vault set --format json`.
-/// Falls back to a mock response when the sidecar is unavailable.
+/// Falls back to a mock credential only when the sidecar cannot be spawned;
+/// returns an error when the sidecar runs but fails (fail-closed for writes).
 #[tauri::command]
 pub async fn vault_set(payload: VaultSetPayload) -> Result<VaultCredential, String> {
     if payload.username.trim().is_empty() {
         return Err("Username must not be empty".into());
     }
-    if payload.password.is_empty() {
-        return Err("Password must not be empty".into());
+    if let Some(ref pw) = payload.password {
+        if pw.is_empty() {
+            return Err("Password must not be empty".into());
+        }
     }
     if matches!(payload.scope, CredentialScope::Group | CredentialScope::Device) {
         if payload.target.as_deref().map(str::trim).unwrap_or("").is_empty() {
@@ -1362,48 +1402,60 @@ pub async fn vault_set(payload: VaultSetPayload) -> Result<VaultCredential, Stri
     let json_payload =
         serde_json::to_string(&payload).map_err(|e| format!("Serialise error: {e}"))?;
 
-    let output = Command::new("python3")
+    let spawn_result = Command::new("python3")
         .args(["-m", "netops.core.vault", "set", "--format", "json"])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn();
 
-    if let Ok(mut child) = output {
-        use tokio::io::AsyncWriteExt;
-        if let Some(stdin) = child.stdin.take() {
-            let mut stdin = tokio::io::BufWriter::new(stdin);
-            let _ = stdin.write_all(json_payload.as_bytes()).await;
-            let _ = stdin.flush().await;
+    match spawn_result {
+        Err(_) => {
+            // Sidecar unavailable — echo back a mock credential for offline/dev mode.
+            let id = format!(
+                "{}-{}",
+                match payload.scope {
+                    CredentialScope::Default => "default",
+                    CredentialScope::Group => "group",
+                    CredentialScope::Device => "device",
+                },
+                payload.target.as_deref().unwrap_or("new")
+            );
+            Ok(VaultCredential {
+                id,
+                scope: payload.scope,
+                target: payload.target,
+                username: payload.username,
+                auth_method: payload.auth_method,
+                has_enable_secret: payload.enable_secret.is_some(),
+            })
         }
-        if let Ok(out) = child.wait_with_output().await {
-            if out.status.success() {
-                let text = String::from_utf8_lossy(&out.stdout);
-                if let Ok(cred) = serde_json::from_str::<VaultCredential>(&text) {
-                    return Ok(cred);
+        Ok(mut child) => {
+            use tokio::io::AsyncWriteExt;
+            if let Some(stdin) = child.stdin.take() {
+                let mut stdin = tokio::io::BufWriter::new(stdin);
+                let _ = stdin.write_all(json_payload.as_bytes()).await;
+                let _ = stdin.flush().await;
+            }
+            match child.wait_with_output().await {
+                Err(e) => Err(format!("Failed to wait for vault set process: {e}")),
+                Ok(out) => {
+                    if out.status.success() {
+                        let text = String::from_utf8_lossy(&out.stdout);
+                        serde_json::from_str::<VaultCredential>(&text)
+                            .map_err(|_| "Failed to parse vault set response".into())
+                    } else {
+                        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                        Err(if stderr.is_empty() {
+                            "vault_set failed".into()
+                        } else {
+                            stderr
+                        })
+                    }
                 }
             }
         }
     }
-
-    // Mock: echo back the payload as a masked credential
-    let id = format!(
-        "{}-{}",
-        match payload.scope {
-            CredentialScope::Default => "default",
-            CredentialScope::Group => "group",
-            CredentialScope::Device => "device",
-        },
-        payload.target.as_deref().unwrap_or("new")
-    );
-    Ok(VaultCredential {
-        id,
-        scope: payload.scope,
-        target: payload.target,
-        username: payload.username,
-        auth_method: payload.auth_method,
-        has_enable_secret: payload.enable_secret.is_some(),
-    })
 }
 
 /// Delete a credential from the vault by id.

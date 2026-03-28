@@ -51,15 +51,12 @@
 			await loadCredentials();
 			view = 'list';
 		} catch (err) {
-			// If the backend returned a meaningful error (e.g. wrong password), surface it.
-			// Otherwise fall back to mock data so the app is usable without the sidecar.
-			if (typeof err === 'string' && err.length > 0) {
-				errorMsg = err;
-			} else {
-				credentials = mockCredentials;
-				masterPassword = '';
-				view = 'list';
-			}
+			// Tauri rejects with an Error object when the Rust command returns Err(String).
+			// Surface the message so the user knows if the password was wrong.
+			// If the sidecar was unavailable the Rust side already fell back to mock and
+			// returned Ok, so this catch only fires on real backend errors.
+			const message = err instanceof Error ? err.message : String(err);
+			errorMsg = message || 'Unlock failed.';
 		} finally {
 			loading = false;
 		}
@@ -85,15 +82,10 @@
 			credentials = [];
 			view = 'list';
 		} catch (err) {
-			// Surface backend validation errors; fall through to mock otherwise.
-			if (typeof err === 'string' && err.length > 0) {
-				errorMsg = err;
-			} else {
-				credentials = [];
-				masterPassword = '';
-				masterPasswordConfirm = '';
-				view = 'list';
-			}
+			// Surface backend validation errors (e.g. vault already initialised).
+			// Unavailable sidecar already returns Ok(mock) from Rust.
+			const message = err instanceof Error ? err.message : String(err);
+			errorMsg = message || 'Vault init failed.';
 		} finally {
 			loading = false;
 		}
@@ -250,25 +242,10 @@
 			}
 			successMsg = editingId ? 'Credential updated.' : 'Credential added.';
 			view = 'list';
-		} catch {
-			// Fallback mock save
-			const mockCred: VaultCredential = {
-				id: editingId ?? `${formScope}-${crypto.randomUUID()}`,
-				scope: formScope,
-				target: formTarget.trim() || undefined,
-				username: formUsername.trim(),
-				authMethod: formAuthMethod,
-				hasEnableSecret: !!formEnableSecret
-			};
-			if (editingId) {
-				const idx = credentials.findIndex((c) => c.id === editingId);
-				if (idx >= 0) credentials[idx] = mockCred;
-				else credentials.push(mockCred);
-			} else {
-				credentials.push(mockCred);
-			}
-			successMsg = editingId ? 'Credential updated.' : 'Credential added.';
-			view = 'list';
+		} catch (err) {
+			// Surface the backend error — the Rust side already mocks for offline/dev.
+			const message = err instanceof Error ? err.message : String(err);
+			errorMsg = message || 'Failed to save credential.';
 		} finally {
 			formPassword = '';
 			formEnableSecret = '';
@@ -326,12 +303,54 @@
 			const { vaultResolve } = await import('$lib/services/vault.js');
 			resolveResult = await vaultResolve(resolveHostname.trim());
 		} catch {
-			// Mock resolve
-			const { mockResolveResult } = await import('$lib/data/mock-vault.js');
-			resolveResult = { ...mockResolveResult, hostname: resolveHostname.trim() };
+			// Compute mock resolution dynamically from mockCredentials so the result
+			// is accurate for any hostname, not just the hardcoded "core-rtr-01" example.
+			resolveResult = computeMockResolve(resolveHostname.trim());
 		} finally {
 			resolveLoading = false;
 		}
+	}
+
+	/** Mirrors the default → group → device resolution hierarchy from the Rust mock. */
+	function computeMockResolve(hostname: string): {
+		hostname: string;
+		resolved: VaultCredential | null;
+		explanation: string;
+	} {
+		// device-specific match
+		const device = mockCredentials.find(
+			(c) => c.scope === 'device' && c.target === hostname
+		);
+		if (device) {
+			return {
+				hostname,
+				resolved: device,
+				explanation: `Device-specific credential matched for "${hostname}".`
+			};
+		}
+		// group pattern match (prefix glob: "core-*" or "10.0.1.*")
+		const group = mockCredentials.find((c) => {
+			if (c.scope !== 'group' || !c.target) return false;
+			if (c.target.endsWith('*')) return hostname.startsWith(c.target.slice(0, -1));
+			return c.target === hostname;
+		});
+		if (group) {
+			return {
+				hostname,
+				resolved: group,
+				explanation: `Group credential matched pattern "${group.target}" for "${hostname}".`
+			};
+		}
+		// default fallback
+		const def = mockCredentials.find((c) => c.scope === 'default');
+		if (def) {
+			return {
+				hostname,
+				resolved: def,
+				explanation: `No specific credential found; using default for "${hostname}".`
+			};
+		}
+		return { hostname, resolved: null, explanation: `No credential found for "${hostname}".` };
 	}
 
 	// ── Badge helpers ─────────────────────────────────────────────────────────

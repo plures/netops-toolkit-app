@@ -29,7 +29,8 @@ export interface VaultSetPayload {
 	scope: CredentialScope;
 	target?: string;
 	username: string;
-	password: string;
+	/** Omit (undefined) when editing to keep the existing password. */
+	password?: string;
 	enableSecret?: string;
 	authMethod: AuthMethod;
 }
