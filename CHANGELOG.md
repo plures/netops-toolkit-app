@@ -1,3 +1,7 @@
+## [0.9.1] — 2026-03-28
+
+- fix: replace local design-dojo shim with real @plures/design-dojo (4d888c7)
+
 ## [0.9.0] — 2026-03-28
 
 - feat: Ansible integration — dynamic inventory export and playbook generation (#33) (b18f175)
