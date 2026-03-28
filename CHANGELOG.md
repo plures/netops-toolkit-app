@@ -1,3 +1,7 @@
+## [0.11.0] — 2026-03-28
+
+- feat: add tests (33 passing), admin guide, vitest setup (63b58de)
+
 ## [0.10.0] — 2026-03-28
 
 - feat: partition-based licensing system (replaces device-count model) (19311e2)
