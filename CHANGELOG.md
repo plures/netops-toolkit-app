@@ -1,3 +1,7 @@
+## [0.12.4] — 2026-03-28
+
+- fix: devUrl → port 5173 to match SvelteKit default (eeb136c)
+
 ## [0.12.3] — 2026-03-28
 
 - fix: remove setup-python from tauri beforeDevCommand (c2d72d5)
