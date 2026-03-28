@@ -89,8 +89,8 @@
 				inventoryFormat,
 				Object.keys(filter).length > 0 ? filter : undefined
 			);
-		} catch {
-			// Fallback to mock data
+		} catch (err) {
+			console.warn('Ansible inventory export failed, using mock data:', err);
 			inventoryPreview =
 				inventoryFormat === 'json' ? mockInventoryJson : mockInventoryYaml;
 		} finally {
@@ -140,8 +140,8 @@
 				selectedTemplateId,
 				templateVariables
 			);
-		} catch {
-			// Fallback to mock data
+		} catch (err) {
+			console.warn('Playbook generation failed, using mock data:', err);
 			playbookPreview = mockGeneratedPlaybook;
 		} finally {
 			playbookLoading = false;
