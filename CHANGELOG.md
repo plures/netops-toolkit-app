@@ -1,3 +1,7 @@
+## [0.12.5] — 2026-03-28
+
+- fix: remove stale shell.scope from tauri.conf.json (d69d6a1)
+
 ## [0.12.4] — 2026-03-28
 
 - fix: devUrl → port 5173 to match SvelteKit default (eeb136c)
