@@ -96,7 +96,13 @@
 					tabindex="0"
 					aria-selected={tab.id === terminalStore.activeTabId}
 					onclick={() => terminalStore.setActiveTab(tab.id)}
-					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); terminalStore.setActiveTab(tab.id); } }}
+					onkeydown={(e: KeyboardEvent) => {
+						if (e.target !== e.currentTarget) return;
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							terminalStore.setActiveTab(tab.id);
+						}
+					}}
 				>
 					<span class="tab-icon">{tab.type === 'ssh' ? '🔗' : '💻'}</span>
 					<span class="tab-label">{tab.label}</span>
