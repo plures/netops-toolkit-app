@@ -1,3 +1,7 @@
+## [0.12.1] — 2026-03-28
+
+- fix: add placeholder icons for Windows build (4f7d3cb)
+
 ## [0.12.0] — 2026-03-28
 
 - feat: auto-install netops-toolkit Python backend on build (2f6d1c4)
