@@ -1,3 +1,7 @@
+## [0.8.2] — 2026-03-28
+
+- fix: add packages:write + id-token:write to release workflow (fa3b1e6)
+
 ## [0.8.1] — 2026-03-28
 
 - fix: resolve TypeScript and Svelte 5 errors blocking CI (#32) (b4745d8)
