@@ -1,3 +1,8 @@
+## [0.11.1] — 2026-03-28
+
+- fix: remove unused externalBin sidecar, use platform-correct python (3936421)
+- chore: switch license from AGPL-3.0 to BSL 1.1 (d652539)
+
 ## [0.11.0] — 2026-03-28
 
 - feat: add tests (33 passing), admin guide, vitest setup (63b58de)
