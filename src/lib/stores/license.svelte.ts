@@ -1,3 +1,11 @@
+// ─── Legacy License Store ───────────────────────────────────────────────────
+// Device-count gating for features within a partition.
+// This is the per-feature soft gate, NOT the partition billing model.
+// For partition/tier licensing, see license-store.svelte.ts.
+//
+// Kept for backward compatibility — components import from here.
+// Will be consolidated into license-store once migration is complete.
+
 import {
 	type LicenseInfo,
 	type LicensedFeature,

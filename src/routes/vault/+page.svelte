@@ -224,6 +224,7 @@
 		errorMsg = '';
 		try {
 			const payload: VaultSetPayload = {
+				vaultType: 'personal',
 				scope: formScope,
 				target: formTarget.trim() || undefined,
 				username: formUsername.trim(),

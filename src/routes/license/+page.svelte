@@ -1,219 +1,332 @@
 <script lang="ts">
-	import { Button, Badge, StatusBar, StatusBarItem, StatusBarSpacer } from '@plures/design-dojo';
-	import { useTui } from '@plures/design-dojo';
-	import { licenseStore, FREE_TIER_DEVICE_LIMIT, GATED_FEATURES } from '$lib/stores/license.svelte.js';
+	import { licenseStore } from '$lib/stores/license-store.svelte.js';
+	import { partitionStore } from '$lib/stores/partition-store.svelte.js';
+	import {
+		formatPartitionLimit,
+		UNLIMITED_USERS_LABEL,
+		checkCreateSyncedPartition,
+	} from '$lib/domain/entitlements.js';
+	import { TIER_MATRIX, ALL_FEATURES } from '$lib/domain/feature-matrix.js';
+	import type { LicenseFile } from '$lib/domain/license.js';
+	import { Button, Badge } from '@plures/design-dojo';
 
-	const getTui = useTui();
-	let tui = $derived(getTui());
+	let importError = $state<string | null>(null);
+	let importSuccess = $state(false);
+	let fileInput: HTMLInputElement;
 
-	let email = $state('');
-	let key = $state('');
-	let errorMsg = $state('');
-	let successMsg = $state('');
+	const entitlements = $derived(licenseStore.entitlements);
+	const tierDef = $derived(TIER_MATRIX[licenseStore.tier]);
 
-	function handleActivate(): void {
-		errorMsg = '';
-		const result = licenseStore.activate(email, key);
-		if (!result.ok) {
-			errorMsg = result.error ?? 'Activation failed.';
-		} else {
-			successMsg = 'License activated! All features are now unlimited.';
-			email = '';
-			key = '';
+	function handleFileImport(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+
+		importError = null;
+		importSuccess = false;
+
+		const reader = new FileReader();
+		reader.onload = () => {
+			try {
+				const parsed = JSON.parse(reader.result as string) as LicenseFile;
+				const result = licenseStore.importLicense(parsed);
+				if (result.ok) {
+					importSuccess = true;
+				} else {
+					importError = result.error ?? 'Import failed.';
+				}
+			} catch {
+				importError = 'Invalid license file format.';
+			}
+		};
+		reader.readAsText(file);
+	}
+
+	function deactivate() {
+		if (confirm('Deactivate license and revert to Free tier? Synced partitions will be suspended.')) {
+			licenseStore.deactivate();
 		}
 	}
 
-	function handleDeactivate(): void {
-		licenseStore.deactivate();
-		successMsg = '';
-		errorMsg = '';
-	}
+	type BadgeVariant = 'default' | 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'muted' | 'outline' | 'ghost';
 
-	$effect(() => {
-		if (!successMsg) return;
-		const t = setTimeout(() => { successMsg = ''; }, 5000);
-		return () => clearTimeout(t);
-	});
+	const STATUS_COLORS: Record<string, BadgeVariant> = {
+		active: 'success',
+		grace: 'warning',
+		expired: 'danger',
+		suspended: 'danger',
+		revoked: 'danger',
+	};
+
+	const TIER_LABELS: Record<string, string> = {
+		free: 'Free',
+		pro: 'Pro',
+		team: 'Team',
+		enterprise: 'Enterprise',
+	};
 </script>
 
-{#if tui}
-	<div class="license-page tui">
-		<div class="header">
-			<span class="title">LICENSE</span>
-			<span class="info">Tier: {licenseStore.tier.toUpperCase()}</span>
+<div class="license-page">
+	<h1>License</h1>
+
+	<!-- Status Card -->
+	<section class="card">
+		<h2>Current License</h2>
+		<div class="status-row">
+			<span class="tier-badge">{TIER_LABELS[licenseStore.tier]}</span>
+			<Badge variant={STATUS_COLORS[licenseStore.status] ?? 'neutral'}>
+				{licenseStore.status}
+			</Badge>
 		</div>
 
-		{#if licenseStore.isPro}
-			<div class="tui-section">
-				<div class="tui-row"><span class="label">Email:</span> <span class="value">{licenseStore.license.email}</span></div>
-				<div class="tui-row"><span class="label">Status:</span> <span class="value active">Active ✓</span></div>
-				<div class="tui-row"><span class="label">Limits:</span> <span class="value">Unlimited (all features)</span></div>
-			</div>
-			<div class="tui-actions">
-				<span role="button" tabindex="0"
-					onclick={handleDeactivate}
-					onkeydown={(e) => { if (e.key === 'Enter') handleDeactivate(); }}
-				>[D] Deactivate License</span>
-			</div>
-		{:else}
-			<div class="tui-section">
-				<div class="tui-row">Free tier — {FREE_TIER_DEVICE_LIMIT} device limit on:</div>
-				{#each GATED_FEATURES as feat}
-					<div class="tui-row">  • {feat}</div>
-				{/each}
-				<div class="tui-row dim">Scan & Inventory: always unlimited</div>
-			</div>
-			<div class="tui-section">
-				<div class="tui-row">ACTIVATE LICENSE</div>
-				<div class="form-row">
-					<label for="tui-lic-email">Email: </label>
-					<input id="tui-lic-email" type="text" bind:value={email} class="tui-input" />
-				</div>
-				<div class="form-row">
-					<label for="tui-lic-key">Key:   </label>
-					<input id="tui-lic-key" type="text" bind:value={key} class="tui-input wide" />
-				</div>
-				{#if errorMsg}<div class="tui-error">{errorMsg}</div>{/if}
-				{#if successMsg}<div class="tui-success">{successMsg}</div>{/if}
-				<div class="tui-actions">
-					<span role="button" tabindex="0"
-						onclick={handleActivate}
-						onkeydown={(e) => { if (e.key === 'Enter') handleActivate(); }}
-					>[Enter] Activate</span>
-				</div>
+		{#if licenseStore.inGracePeriod}
+			<div class="warning-banner">
+				⚠️ License is in grace period. Sync will be disabled when grace expires.
 			</div>
 		{/if}
-	</div>
 
-{:else}
-	<div class="license-page gui">
-		<div class="toolbar">
-			<h2>License</h2>
-			{#if licenseStore.isPro}
-				<Badge variant="success" size="sm">PRO</Badge>
+		<div class="info-grid">
+			<div class="info-item">
+				<span class="label">Partitions</span>
+				<span class="value">{formatPartitionLimit(entitlements)}</span>
+			</div>
+			<div class="info-item">
+				<span class="label">Users</span>
+				<span class="value">{UNLIMITED_USERS_LABEL}</span>
+			</div>
+			<div class="info-item">
+				<span class="label">Org</span>
+				<span class="value">{licenseStore.license.orgId}</span>
+			</div>
+			{#if licenseStore.license.validUntil}
+				<div class="info-item">
+					<span class="label">Expires</span>
+					<span class="value">{new Date(licenseStore.license.validUntil).toLocaleDateString()}</span>
+				</div>
 			{:else}
-				<Badge variant="neutral" size="sm">FREE</Badge>
+				<div class="info-item">
+					<span class="label">Expires</span>
+					<span class="value">Never (perpetual)</span>
+				</div>
+			{/if}
+		</div>
+	</section>
+
+	<!-- Entitlements -->
+	<section class="card">
+		<h2>Entitlements</h2>
+		<div class="feature-grid">
+			{#each ALL_FEATURES as feature}
+				{@const level = entitlements.featureLevels[feature]}
+				<div class="feature-row" class:disabled={level === 'disabled'}>
+					<span class="feature-name">{feature.replace(/_/g, ' ')}</span>
+					<Badge variant={level === 'disabled' ? 'neutral' : level === 'basic' ? 'info' : 'success'}>
+						{level}
+					</Badge>
+				</div>
+			{/each}
+		</div>
+	</section>
+
+	<!-- Partition Usage -->
+	<section class="card">
+		<h2>Partition Usage</h2>
+		<div class="usage-bar">
+			<div class="usage-info">
+				<span>{entitlements.syncedPartitionsUsed} synced</span>
+				<span>{partitionStore.localCount} local</span>
+				<span>{partitionStore.archivedCount} archived</span>
+			</div>
+			{#if entitlements.syncedPartitionLimit > 0}
+				<div class="progress-bar">
+					<div
+						class="progress-fill"
+						style:width={`${Math.min(100, (entitlements.syncedPartitionsUsed / entitlements.syncedPartitionLimit) * 100)}%`}
+						class:near-limit={entitlements.syncedPartitionsRemaining === 1}
+						class:at-limit={entitlements.syncedPartitionsRemaining === 0}
+					></div>
+				</div>
+			{/if}
+		</div>
+	</section>
+
+	<!-- Import / Deactivate -->
+	<section class="card actions">
+		<h2>License Management</h2>
+
+		<input
+			bind:this={fileInput}
+			type="file"
+			accept=".netops-license,.json"
+			onchange={handleFileImport}
+			hidden
+		/>
+
+		<div class="button-row">
+			<Button variant="solid" onclick={() => fileInput.click()}>
+				Import License File
+			</Button>
+			{#if !licenseStore.isFree}
+				<Button variant="outline" onclick={deactivate}>
+					Deactivate License
+				</Button>
 			{/if}
 		</div>
 
-		{#if licenseStore.isPro}
-			<div class="card pro-card">
-				<div class="pro-badge">✨ Pro License Active</div>
-				<dl class="pro-detail">
-					<dt>Email</dt>
-					<dd>{licenseStore.license.email}</dd>
-					<dt>Activated</dt>
-					<dd>{new Date(licenseStore.license.issuedAt).toLocaleDateString()}</dd>
-					<dt>Expires</dt>
-					<dd>{licenseStore.license.expiresAt ? new Date(licenseStore.license.expiresAt).toLocaleDateString() : 'Never (perpetual)'}</dd>
-					<dt>Device Limits</dt>
-					<dd>Unlimited — all features</dd>
-				</dl>
-				<Button variant="ghost" onclick={handleDeactivate}>Deactivate License</Button>
-			</div>
-
-		{:else}
-			<div class="card free-info">
-				<h3>Free Tier</h3>
-				<p>All features are available for personal use. Scan and Inventory have no device limits. Other features are capped at <strong>{FREE_TIER_DEVICE_LIMIT} devices</strong>.</p>
-
-				<div class="feature-grid">
-					<div class="feature unlimited">
-						<span class="feature-icon">🔍</span>
-						<span class="feature-name">Scan</span>
-						<Badge variant="success" size="sm">Unlimited</Badge>
-					</div>
-					<div class="feature unlimited">
-						<span class="feature-icon">📦</span>
-						<span class="feature-name">Inventory</span>
-						<Badge variant="success" size="sm">Unlimited</Badge>
-					</div>
-					{#each GATED_FEATURES as feat}
-						<div class="feature capped">
-							<span class="feature-icon">
-								{feat === 'config' ? '📝' : feat === 'health' ? '💓' : feat === 'vault' ? '🔐' : feat === 'device-detail' ? '🔎' : feat === 'tunneling' ? '🚇' : feat === 'terminal' ? '💻' : '📊'}
-							</span>
-							<span class="feature-name">{feat.replace('-', ' ')}</span>
-							<Badge variant="warning" size="sm">{FREE_TIER_DEVICE_LIMIT} devices</Badge>
-						</div>
-					{/each}
-				</div>
-			</div>
-
-			<div class="card activate-card">
-				<h3>Activate Pro License</h3>
-				<p>Enter your license key to unlock unlimited devices across all features.</p>
-				<div class="field">
-					<label for="gui-lic-email">Email</label>
-					<input id="gui-lic-email" type="email" bind:value={email} placeholder="you@company.com" class="text-input" />
-				</div>
-				<div class="field">
-					<label for="gui-lic-key">License Key</label>
-					<input id="gui-lic-key" type="text" bind:value={key} placeholder="NETOPS-PRO-XXXX-XXXX-XXXX" class="text-input mono" />
-				</div>
-				{#if errorMsg}<p class="error-msg">{errorMsg}</p>{/if}
-				{#if successMsg}<p class="success-msg">{successMsg}</p>{/if}
-				<div class="form-actions">
-					<Button variant="solid" onclick={handleActivate}>Activate License</Button>
-				</div>
-				<p class="purchase-link">
-					Don't have a key? <a href="https://plures.io/pricing" target="_blank" rel="noopener">Purchase at plures.io/pricing</a>
-				</p>
-			</div>
+		{#if importError}
+			<div class="error-message">{importError}</div>
 		{/if}
+		{#if importSuccess}
+			<div class="success-message">License imported successfully.</div>
+		{/if}
+	</section>
 
-		<StatusBar>
-			<StatusBarItem label="Tier" value={licenseStore.tier.toUpperCase()} />
-			<StatusBarSpacer />
-			<StatusBarItem label="View" value="License" />
-		</StatusBar>
-	</div>
-{/if}
+	<!-- Tier Comparison -->
+	<section class="card">
+		<h2>Tier Comparison</h2>
+		<p class="hint">Licenses are consumed by partitions, not users. All tiers include unlimited users per partition.</p>
+		<div class="tier-grid">
+			{#each (['free', 'pro', 'team', 'enterprise'] as const) as tier}
+				{@const def = TIER_MATRIX[tier]}
+				<div class="tier-col" class:current={tier === licenseStore.tier}>
+					<h3>{TIER_LABELS[tier]}</h3>
+					<div class="tier-detail">
+						<span>Synced: {def.maxSyncedPartitions === -1 ? '∞' : def.maxSyncedPartitions}</span>
+						<span>Local: {def.maxLocalPartitions === -1 ? '∞' : def.maxLocalPartitions}</span>
+					</div>
+				</div>
+			{/each}
+		</div>
+	</section>
+</div>
 
 <style>
-	.license-page { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+	.license-page {
+		max-width: 800px;
+		margin: 0 auto;
+		padding: 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
 
-	/* TUI */
-	.license-page.tui { font-family: monospace; color: var(--color-text, #e0e0e0); }
-	.license-page.tui .header { display: flex; justify-content: space-between; padding: 0.5ch 0; border-bottom: 1px solid var(--tui-border, #0f3460); margin-bottom: 0.5ch; }
-	.license-page.tui .title { color: var(--color-accent, #7fefbd); font-weight: bold; }
-	.license-page.tui .info { color: var(--tui-text-dim, #888); }
-	.tui-section { padding: 0.5ch 0; display: flex; flex-direction: column; gap: 0.25ch; }
-	.tui-row { display: flex; gap: 1ch; }
-	.tui-row .label { color: var(--tui-text-dim, #888); min-width: 10ch; }
-	.tui-row .value { color: var(--color-text, #e0e0e0); }
-	.tui-row .value.active { color: var(--color-success, #56d364); }
-	.tui-row.dim { color: var(--tui-text-dim, #484f58); }
-	.form-row { display: flex; align-items: center; gap: 1ch; }
-	.tui-input { background: transparent; border: 1px solid var(--tui-border, #444); color: inherit; font-family: monospace; padding: 0.25ch 0.5ch; font-size: 1em; width: 24ch; }
-	.tui-input.wide { width: 36ch; }
-	.tui-error { color: var(--color-error, #f38ba8); }
-	.tui-success { color: var(--color-success, #a6e3a1); }
-	.tui-actions { display: flex; gap: 2ch; padding: 0.5ch 0; border-top: 1px solid var(--tui-border, #0f3460); color: var(--tui-text-dim, #888); font-size: 0.875rem; margin-top: auto; }
+	.card {
+		background: var(--surface-1, #1e1e2e);
+		border: 1px solid var(--border, #333);
+		border-radius: 8px;
+		padding: 1.5rem;
+	}
 
-	/* GUI */
-	.toolbar { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-border, #333); flex-shrink: 0; }
-	.toolbar h2 { margin: 0; font-size: 1.125rem; font-weight: 600; }
-	.card { margin: 1rem; padding: 1.5rem; background: var(--color-bg-card, #24283b); border: 1px solid var(--color-border, #3b4261); border-radius: 8px; }
-	.card h3 { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--color-text, #c0caf5); }
-	.card p { margin: 0 0 1rem; color: var(--color-text-secondary, #a9b1d6); font-size: 0.9rem; line-height: 1.5; }
-	.pro-card { border-color: var(--color-success, #9ece6a); }
-	.pro-badge { font-size: 1.125rem; font-weight: 600; color: var(--color-success, #9ece6a); margin-bottom: 1rem; }
-	.pro-detail { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0 0 1rem; font-size: 0.9rem; }
-	.pro-detail dt { color: var(--color-text-secondary, #565f89); font-weight: 500; }
-	.pro-detail dd { margin: 0; color: var(--color-text, #c0caf5); }
-	.feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
-	.feature { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: var(--color-bg, #1a1b26); }
-	.feature-name { flex: 1; text-transform: capitalize; font-size: 0.875rem; }
-	.field { display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0.75rem; }
-	.field label { font-size: 0.8125rem; font-weight: 500; color: var(--color-text-secondary, #a9b1d6); }
-	.text-input { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #3b4261); border-radius: 6px; background: var(--color-bg, #1a1b26); color: var(--color-text, #c0caf5); font-size: 0.9375rem; width: 100%; max-width: 400px; box-sizing: border-box; }
-	.text-input.mono { font-family: 'SF Mono', monospace; letter-spacing: 0.5px; }
-	.text-input:focus { outline: 2px solid var(--color-accent, #7aa2f7); outline-offset: 1px; }
-	.error-msg { color: var(--color-error, #f85149); font-size: 0.875rem; margin: 0 0 0.5rem; }
-	.success-msg { color: var(--color-success, #9ece6a); font-size: 0.875rem; margin: 0 0 0.5rem; }
-	.form-actions { display: flex; gap: 0.5rem; }
-	.purchase-link { margin-top: 1rem; font-size: 0.8125rem; color: var(--color-text-secondary, #565f89); }
-	.purchase-link a { color: var(--color-accent, #7aa2f7); text-decoration: none; }
-	.purchase-link a:hover { text-decoration: underline; }
+	h1 { margin: 0; }
+	h2 { margin: 0 0 1rem; font-size: 1.1rem; }
+
+	.status-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 1rem;
+	}
+
+	.tier-badge {
+		font-size: 1.5rem;
+		font-weight: 700;
+	}
+
+	.warning-banner {
+		background: var(--warning-bg, #4a3f00);
+		border: 1px solid var(--warning, #ffa500);
+		border-radius: 4px;
+		padding: 0.75rem;
+		margin-bottom: 1rem;
+	}
+
+	.info-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.5rem;
+	}
+
+	.info-item {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.info-item .label {
+		font-size: 0.75rem;
+		opacity: 0.6;
+		text-transform: uppercase;
+	}
+
+	.info-item .value {
+		font-weight: 500;
+	}
+
+	.feature-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.feature-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.25rem 0;
+		text-transform: capitalize;
+	}
+
+	.feature-row.disabled {
+		opacity: 0.5;
+	}
+
+	.usage-bar { display: flex; flex-direction: column; gap: 0.5rem; }
+
+	.usage-info {
+		display: flex;
+		gap: 1.5rem;
+	}
+
+	.progress-bar {
+		height: 8px;
+		background: var(--surface-2, #2a2a3e);
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.progress-fill {
+		height: 100%;
+		background: var(--primary, #7c3aed);
+		border-radius: 4px;
+		transition: width 0.3s;
+	}
+
+	.progress-fill.near-limit { background: var(--warning, #ffa500); }
+	.progress-fill.at-limit { background: var(--danger, #ef4444); }
+
+	.button-row { display: flex; gap: 0.75rem; }
+	.error-message { color: var(--danger, #ef4444); margin-top: 0.75rem; }
+	.success-message { color: var(--success, #22c55e); margin-top: 0.75rem; }
+
+	.hint { font-size: 0.85rem; opacity: 0.7; margin: 0 0 1rem; }
+
+	.tier-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 0.75rem;
+	}
+
+	.tier-col {
+		padding: 0.75rem;
+		border: 1px solid var(--border, #333);
+		border-radius: 6px;
+		text-align: center;
+	}
+
+	.tier-col.current {
+		border-color: var(--primary, #7c3aed);
+		background: var(--surface-2, #2a2a3e);
+	}
+
+	.tier-col h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+	.tier-detail { font-size: 0.8rem; opacity: 0.7; display: flex; flex-direction: column; gap: 0.25rem; }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import type { Snippet } from 'svelte';
+	import { partitionStore } from '$lib/stores/partition-store.svelte.js';
 
 	interface Props {
 		/** Render in TUI (terminal) mode instead of GUI mode. */
@@ -19,6 +20,7 @@
 		{ icon: '🔐', label: 'Vault', href: '/vault' },
 		{ icon: '🚇', label: 'Tunnels', href: '/tunnels' },
 		{ icon: '💻', label: 'Terminal', href: '/terminal' },
+		{ icon: '🗂️', label: 'Partitions', href: '/partitions' },
 		{ icon: '🪪', label: 'License', href: '/license' },
 		{ icon: '⚙️', label: 'Settings', href: '/settings' }
 	] as const;
@@ -57,6 +59,26 @@
 	<!-- GUI mode: styled sidebar with icons and hover effects -->
 	<div class="app-shell gui" role="application">
 		<nav class="gui-sidebar" aria-label="Main navigation">
+			<!-- Partition Switcher -->
+			{#if partitionStore.partitions.length > 1}
+				<div class="partition-switcher">
+					<select
+						value={partitionStore.activePartitionId}
+						onchange={(e) => partitionStore.switchTo((e.target as HTMLSelectElement).value)}
+						aria-label="Active partition"
+					>
+						{#each partitionStore.partitions.filter(p => p.state !== 'archived') as p}
+							<option value={p.partitionId}>
+								{p.displayName} ({p.state === 'synced' ? '🔄' : p.state === 'suspended' ? '⏸️' : '📁'})
+							</option>
+						{/each}
+					</select>
+				</div>
+			{:else if partitionStore.activePartition}
+				<div class="partition-indicator">
+					📁 {partitionStore.activePartition.displayName}
+				</div>
+			{/if}
 			<ul role="list">
 				{#each navItems as item}
 					<li>

@@ -351,7 +351,7 @@
 						</select>
 					</div>
 					<Button
-						variant="primary"
+						variant="solid"
 						onclick={handleExportPreview}
 						disabled={inventoryLoading}
 					>
@@ -430,7 +430,7 @@
 					<div class="sidebar-section">
 						<h3>
 							Devices
-							<Button variant="secondary" onclick={handleSelectAllDevices}>
+							<Button variant="outline" onclick={handleSelectAllDevices}>
 								{selectedDevices.length === devices.length ? 'Deselect All' : 'Select All'}
 							</Button>
 						</h3>
@@ -456,7 +456,7 @@
 					</div>
 
 					<Button
-						variant="primary"
+						variant="solid"
 						onclick={handleGeneratePlaybook}
 						disabled={playbookLoading || !selectedTemplateId || selectedDevices.length === 0}
 					>
