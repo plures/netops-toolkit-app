@@ -269,6 +269,8 @@
 			successMsg = editingId ? 'Credential updated.' : 'Credential added.';
 			view = 'list';
 		} finally {
+			formPassword = '';
+			formEnableSecret = '';
 			loading = false;
 		}
 	}
