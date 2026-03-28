@@ -1,3 +1,11 @@
+## [0.7.0] — 2026-03-28
+
+- feat: Credential Vault UI — encrypted credential management (#31) (3a4df80)
+- docs: add ROADMAP.md (8b4244e)
+- chore: cleanup and housekeeping (48212c6)
+- chore: standardize CI workflow (7057a60)
+- chore: standardize lint-clean across org (85afcf4)
+
 ## [0.6.0] — 2026-03-27
 
 - feat: health dashboard — fleet-wide CPU, memory, interface errors, log alerts (#30) (baa7d98)
