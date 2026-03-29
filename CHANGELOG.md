@@ -1,3 +1,7 @@
+## [0.12.6] — 2026-03-29
+
+- fix: wrap root layout in AppShell for sidebar navigation (2bce31d)
+
 ## [0.12.5] — 2026-03-28
 
 - fix: remove stale shell.scope from tauri.conf.json (d69d6a1)
