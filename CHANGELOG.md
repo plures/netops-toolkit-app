@@ -1,3 +1,8 @@
+## [0.13.0] — 2026-03-29
+
+- feat: Obsidian visual overhaul — SVG icons, dark bg, compact nav (9ae2d61)
+- qa: strict CI + store import smoke tests (2debbb1)
+
 ## [0.12.8] — 2026-03-29
 
 - fix: effect_orphan crash in PartitionStore + add favicon (4517dd7)
