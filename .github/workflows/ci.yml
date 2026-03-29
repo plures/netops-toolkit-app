@@ -33,19 +33,16 @@ jobs:
             libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci || npm install
 
       - name: Svelte check
-        run: npm run check || echo "check skipped (project bootstrapping)"
+        run: npm run check
 
       - name: Lint
-        run: npx eslint . || echo "no eslint config yet"
-
-      - name: Type check
-        run: npm run check || echo "check skipped (project bootstrapping)"
+        run: npx eslint .
 
       - name: Test
-        run: npm test || echo "no tests yet"
+        run: npm test
 
       - name: Build
         run: npm run build
