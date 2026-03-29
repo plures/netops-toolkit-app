@@ -67,7 +67,9 @@
 	);
 
 	let selectedDevice = $derived<Device | undefined>(
-		selectedIndex !== undefined ? filteredDevices[selectedIndex] : undefined
+		selectedIndex !== undefined && selectedIndex < filteredDevices.length
+			? filteredDevices[selectedIndex]
+			: undefined
 	);
 
 	// --- Vendor counts ---
@@ -220,8 +222,8 @@
 						<div class="detail-row">
 							<dt>Vendor</dt>
 							<dd>
-								<Badge variant={vendorBadgeVariant(selectedDevice.vendor)} tui={getTui()}>
-									{vendorLabel(selectedDevice.vendor)}
+								<Badge variant={vendorBadgeVariant(selectedDevice?.vendor ?? 'cisco_ios')} tui={getTui()}>
+									{vendorLabel(selectedDevice?.vendor ?? 'cisco_ios')}
 								</Badge>
 							</dd>
 						</div>
