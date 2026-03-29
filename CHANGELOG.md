@@ -1,3 +1,7 @@
+## [0.12.8] — 2026-03-29
+
+- fix: effect_orphan crash in PartitionStore + add favicon (4517dd7)
+
 ## [0.12.7] — 2026-03-29
 
 - fix: guard against undefined selectedDevice in inventory (44a1c83)
