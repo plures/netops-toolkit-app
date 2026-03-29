@@ -22,10 +22,8 @@ class PartitionStore {
 
 	constructor() {
 		this.load();
-		// Sync partition list to license store for entitlement computation
-		$effect(() => {
-			licenseStore.setPartitions(this.partitions);
-		});
+		// Initial sync to license store
+		licenseStore.setPartitions(this.partitions);
 	}
 
 	// ── Derived State ────────────────────────────────────────────────────────
@@ -85,6 +83,8 @@ class PartitionStore {
 		if (this.activePartitionId) {
 			localStorage.setItem(ACTIVE_PARTITION_KEY, this.activePartitionId);
 		}
+		// Keep license store in sync for entitlement computation
+		licenseStore.setPartitions(this.partitions);
 	}
 
 	// ── Actions ──────────────────────────────────────────────────────────────
