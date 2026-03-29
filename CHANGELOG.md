@@ -1,3 +1,7 @@
+## [0.12.7] — 2026-03-29
+
+- fix: guard against undefined selectedDevice in inventory (44a1c83)
+
 ## [0.12.6] — 2026-03-29
 
 - fix: wrap root layout in AppShell for sidebar navigation (2bce31d)
