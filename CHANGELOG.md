@@ -1,3 +1,7 @@
+## [0.13.1] — 2026-03-31
+
+- fix(lifecycle): rewrite v9 — apply suggestions, merge, no nudges (b2d8e6f)
+
 ## [0.13.0] — 2026-03-29
 
 - feat: Obsidian visual overhaul — SVG icons, dark bg, compact nav (9ae2d61)
