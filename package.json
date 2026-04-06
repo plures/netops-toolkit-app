@@ -45,6 +45,6 @@
     "url": "https://github.com/plures/netops-toolkit-app.git"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   }
 }
