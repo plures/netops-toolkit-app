@@ -52,6 +52,37 @@
 		return `${(bytes / 1024).toFixed(1)} KB`;
 	}
 
+	/** Escape HTML entities for safe {@html} rendering. */
+	function escapeHtml(text: string): string {
+		return text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+	}
+
+	/** Apply syntax highlighting to IOS/JunOS config text. */
+	function highlightConfig(raw: string): string {
+		return raw
+			.split('\n')
+			.map((line) => {
+				const escaped = escapeHtml(line);
+				// Comments (lines starting with !)
+				if (/^\s*!/.test(line)) {
+					return `<span class="hl-comment">${escaped}</span>`;
+				}
+				// Section keywords at line start
+				return escaped.replace(
+					/^(\s*)(interface|router|hostname|version|ip|no|end|neighbor|route|address|shutdown|remote-as|bgp|line|service|logging|ntp|snmp-server|access-list|permit|deny|vlan|switchport|spanning-tree|crypto|tunnel|description)\b/,
+					'$1<span class="hl-keyword">$2</span>'
+				);
+			})
+			.join('\n');
+	}
+
+	let highlightedConfig = $derived(selectedConfig ? highlightConfig(selectedConfig) : null);
+
 	function handleSelect(index: number): void {
 		selectedIndex = index;
 		const backup = backups[index];
@@ -116,10 +147,10 @@
 			tui={true}
 		/>
 
-		{#if selectedConfig}
+		{#if highlightedConfig}
 			<div class="config-preview">
 				<div class="preview-title">── Config {rollbackTarget} ──</div>
-				<pre class="config-content">{selectedConfig}</pre>
+				<pre class="config-content">{@html highlightedConfig}</pre>
 			</div>
 		{/if}
 
@@ -168,8 +199,8 @@
 				/>
 			</Pane>
 			<Pane flex={2} title={selectedConfig ? `Config — ${rollbackTarget}` : 'Select a version'} scrollable>
-				{#if selectedConfig}
-					<pre class="config-viewer">{selectedConfig}</pre>
+				{#if highlightedConfig}
+					<pre class="config-viewer">{@html highlightedConfig}</pre>
 
 					<div class="rollback-panel">
 						{#if rollbackMessage}
@@ -317,8 +348,22 @@
 		overflow: auto;
 	}
 
-	.config-viewer :global(.keyword) {
+	.config-viewer :global(.hl-keyword) {
 		color: var(--color-accent, #89b4fa);
+		font-weight: 600;
+	}
+
+	.config-viewer :global(.hl-comment) {
+		color: var(--color-text-muted, #6c7086);
+		font-style: italic;
+	}
+
+	.config-content :global(.hl-keyword) {
+		color: var(--color-accent, #7fefbd);
+	}
+
+	.config-content :global(.hl-comment) {
+		color: var(--tui-text-dim, #666);
 	}
 
 	.rollback-panel {

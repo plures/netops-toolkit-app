@@ -65,6 +65,65 @@
 		});
 	});
 
+	interface SideLine {
+		left: { text: string; type: 'del' | 'context' | 'empty' };
+		right: { text: string; type: 'add' | 'context' | 'empty' };
+	}
+
+	/** Parse unified diff into side-by-side rows. */
+	let sideBySideLines = $derived.by((): SideLine[] => {
+		if (!diffResult) return [];
+		const raw = diffResult.unified.split('\n');
+		const rows: SideLine[] = [];
+		const delBuf: string[] = [];
+		const addBuf: string[] = [];
+
+		function flushBuffers(): void {
+			const max = Math.max(delBuf.length, addBuf.length);
+			for (let i = 0; i < max; i++) {
+				rows.push({
+					left: i < delBuf.length
+						? { text: delBuf[i].substring(1), type: 'del' }
+						: { text: '', type: 'empty' },
+					right: i < addBuf.length
+						? { text: addBuf[i].substring(1), type: 'add' }
+						: { text: '', type: 'empty' }
+				});
+			}
+			delBuf.length = 0;
+			addBuf.length = 0;
+		}
+
+		for (const line of raw) {
+			const isHeader =
+				line.startsWith('@@') ||
+				line.startsWith('+++ ') ||
+				line.startsWith('--- ') ||
+				line.startsWith('diff ') ||
+				line.startsWith('index ');
+
+			if (isHeader) {
+				flushBuffers();
+				continue;
+			}
+
+			if (line.startsWith('-')) {
+				delBuf.push(line);
+			} else if (line.startsWith('+')) {
+				addBuf.push(line);
+			} else {
+				flushBuffers();
+				const text = line.startsWith(' ') ? line.substring(1) : line;
+				rows.push({
+					left: { text, type: 'context' },
+					right: { text, type: 'context' }
+				});
+			}
+		}
+		flushBuffers();
+		return rows;
+	});
+
 	async function loadDiff(): Promise<void> {
 		if (!selectedHostname || !selectedVersionA || !selectedVersionB) return;
 		loading = true;
@@ -170,13 +229,17 @@
 		{/if}
 
 		{#if diffResult}
+			<div class="diff-stats-bar">
+				<Badge variant="success" size="sm">+{diffResult.additions}</Badge>
+				<Badge variant="danger" size="sm">-{diffResult.deletions}</Badge>
+			</div>
 			<SplitPane direction="horizontal">
-				<Pane flex={1} title="Diff: {diffResult.versionA} → {diffResult.versionB}" scrollable>
-					<div class="diff-stats">
-						<Badge variant="success" size="sm">+{diffResult.additions}</Badge>
-						<Badge variant="danger" size="sm">-{diffResult.deletions}</Badge>
-					</div>
-					<pre class="diff-viewer">{#each diffLines as line}<span class="diff-line {line.type}">{line.text}</span>
+				<Pane flex={1} title="{diffResult.versionA} (old)" scrollable>
+					<pre class="side-viewer">{#each sideBySideLines as row}<span class="diff-line {row.left.type}">{row.left.text}</span>
+{/each}</pre>
+				</Pane>
+				<Pane flex={1} title="{diffResult.versionB} (new)" scrollable>
+					<pre class="side-viewer">{#each sideBySideLines as row}<span class="diff-line {row.right.type}">{row.right.text}</span>
 {/each}</pre>
 				</Pane>
 			</SplitPane>
@@ -319,6 +382,24 @@
 		border-bottom: 1px solid var(--color-border, #333);
 	}
 
+	.diff-stats-bar {
+		display: flex;
+		gap: 0.5rem;
+		padding: 0.5rem 1rem;
+		border-bottom: 1px solid var(--color-border, #333);
+		flex-shrink: 0;
+	}
+
+	.side-viewer {
+		font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		margin: 0;
+		padding: 1rem;
+		white-space: pre;
+		overflow: auto;
+	}
+
 	.diff-viewer {
 		font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
 		font-size: 0.8125rem;
@@ -359,5 +440,10 @@
 
 	.diff-line.context {
 		color: var(--color-text, #cdd6f4);
+	}
+
+	.diff-line.empty {
+		color: transparent;
+		background: var(--surface-1, #181825);
 	}
 </style>
