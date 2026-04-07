@@ -1,3 +1,10 @@
+## [0.13.5] — 2026-04-07
+
+- fix: inline reusable workflow to fix schedule trigger failures (e47893d)
+- chore: centralize CI to org-wide reusable workflow (dbdd096)
+- ci: standardize Node version to lts/* — remove hardcoded versions (2c23c7d)
+- ci: centralize lifecycle — event-driven with schedule guard (b21e448)
+
 ## [0.13.4] — 2026-04-01
 
 - fix(lifecycle): v9.2 — process all PRs per tick (return→continue), widen bot filter (f812d23)
