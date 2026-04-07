@@ -1,3 +1,7 @@
+## [0.14.0] — 2026-04-07
+
+- feat: config backup viewer — syntax highlighting and side-by-side diff (#41) (6819f66)
+
 ## [0.13.5] — 2026-04-07
 
 - fix: inline reusable workflow to fix schedule trigger failures (e47893d)
