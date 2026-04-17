@@ -1,3 +1,7 @@
+## [0.14.1] — 2026-04-17
+
+- fix(lifecycle): label-based retry counter + CI fix priority (f78a234)
+
 ## [0.14.0] — 2026-04-07
 
 - feat: config backup viewer — syntax highlighting and side-by-side diff (#41) (6819f66)
