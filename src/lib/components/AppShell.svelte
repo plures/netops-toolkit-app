@@ -22,6 +22,7 @@
 		'config':       'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84a.48.48 0 00-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.48.48 0 00.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z',
 		'changes':      'M3 5h18v2H3V5zm0 6h12v2H3v-2zm0 6h8v2H3v-2zm14-6l4 4-4 4v-3h-4v-2h4v-3z',
 		'vault':        'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z',
+		'ansible':      'M12 2a10 10 0 100 20 10 10 0 000-20zm2.9 14.5L8.5 12l6.4-4.5v9z',
 		'tunnel':       'M4 15V9h16v6H4zm0-8h16V5H4v2zm0 10h16v-2H4v2zm2-7v2h2v-2H6zm4 0v2h2v-2h-2zm4 0v2h2v-2h-2z',
 		'terminal':     'M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-2-1h-6v-2h6v2zM7.5 17l-1.41-1.41L8.67 13l-2.59-2.59L7.5 9l4 4-4 4z',
 		'partition':    'M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z',
@@ -39,6 +40,7 @@
 		{ icon: 'config', label: 'Config', href: '/config' },
 		{ icon: 'changes', label: 'Changes', href: '/changes' },
 		{ icon: 'vault', label: 'Vault', href: '/vault' },
+		{ icon: 'ansible', label: 'Ansible', href: '/ansible' },
 		{ icon: 'tunnel', label: 'Tunnels', href: '/tunnels' },
 		{ icon: 'terminal', label: 'Terminal', href: '/terminal' },
 		{ icon: 'partition', label: 'Partitions', href: '/partitions' },
@@ -46,9 +48,36 @@
 		{ icon: 'settings', label: 'Settings', href: '/settings' }
 	] as const;
 
+	const routeMap: Record<string, (typeof navItems)[number]['href']> = {
+		'/': '/',
+		'/inventory': '/inventory',
+		'/scan': '/scan',
+		'/health': '/health',
+		'/bgp': '/bgp',
+		'/vlans': '/vlans',
+		'/config': '/config',
+		'/changes': '/changes',
+		'/vault': '/vault',
+		'/ansible': '/ansible',
+		'/tunnels': '/tunnels',
+		'/terminal': '/terminal',
+		'/partitions': '/partitions',
+		'/license': '/license',
+		'/settings': '/settings',
+		'/device': '/inventory'
+	};
+
+	function getActiveRoute(pathname: string): (typeof navItems)[number]['href'] | undefined {
+		if (pathname === '/') {
+			return routeMap['/'];
+		}
+
+		const rootPath = `/${pathname.split('/')[1]}`;
+		return routeMap[rootPath];
+	}
+
 	function isActive(href: string): boolean {
-		const pathname = $page.url.pathname;
-		return pathname === href || pathname.startsWith(href + '/');
+		return getActiveRoute($page.url.pathname) === href;
 	}
 </script>
 
