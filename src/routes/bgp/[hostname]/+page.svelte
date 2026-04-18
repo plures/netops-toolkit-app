@@ -99,8 +99,9 @@
 			loading = false;
 		}
 
-		const defaultIndex =
-			neighbors.findIndex((neighbor) => neighbor.neighbor === data.neighbor) ?? -1;
+		const defaultIndex = neighbors.findIndex(
+			(neighbor) => neighbor.neighbor === data.neighbor
+		);
 		selectedIndex = defaultIndex >= 0 ? defaultIndex : neighbors.length > 0 ? 0 : undefined;
 	}
 
