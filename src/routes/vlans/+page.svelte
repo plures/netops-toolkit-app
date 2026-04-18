@@ -183,14 +183,15 @@
 			.map((entry, index) => ({
 				id: `${entry.hostname}-${entry.vlanId}-${index}`,
 				text: `${entry.hostname} · VLAN ${entry.vlanId} ${entry.vlanName}`,
-				score: 1
+				score: 1,
+				meta: { hostname: entry.hostname }
 			}));
 	}
 
 	function handleSearchSelect(item: SearchResult): void {
-		const query = item.text.split('· VLAN')[0]?.trim().toLowerCase();
-		if (query) {
-			selectedHostname = query;
+		const hostname = typeof item.meta?.hostname === 'string' ? item.meta.hostname : '';
+		if (hostnames.includes(hostname)) {
+			selectedHostname = hostname;
 			void refreshInventory();
 		}
 	}
