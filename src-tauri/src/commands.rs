@@ -428,9 +428,13 @@ pub struct InterfaceEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct HealthInfo {
+    #[serde(alias = "cpu_percent")]
     pub cpu_percent: f32,
+    #[serde(alias = "memory_percent")]
     pub memory_percent: f32,
+    #[serde(alias = "temperature_celsius")]
     pub temperature_celsius: Option<f32>,
 }
 
@@ -606,14 +610,20 @@ fn mock_health(_hostname: &str) -> HealthInfo {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct InterfaceErrorEntry {
+    #[serde(alias = "interface_name")]
     pub interface_name: String,
+    #[serde(alias = "crc_errors")]
     pub crc_errors: u64,
+    #[serde(alias = "input_errors")]
     pub input_errors: u64,
+    #[serde(alias = "output_errors")]
     pub output_errors: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LogAlertEntry {
     pub timestamp: String,
     pub severity: String,
@@ -621,47 +631,60 @@ pub struct LogAlertEntry {
     pub message: String,
 }
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
-    pub struct DeviceHealthEntry {
-        pub hostname: String,
-        pub ip: String,
-        pub vendor: String,
-        pub status: String,
-        pub cpu_percent: f32,
-        pub memory_percent: f32,
-        pub temperature_celsius: Option<f32>,
-        pub interface_errors: Vec<InterfaceErrorEntry>,
-        pub log_alerts: Vec<LogAlertEntry>,
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceHealthEntry {
+    pub hostname: String,
+    pub ip: String,
+    pub vendor: String,
+    pub status: String,
+    #[serde(alias = "cpu_percent")]
+    pub cpu_percent: f32,
+    #[serde(alias = "memory_percent")]
+    pub memory_percent: f32,
+    #[serde(alias = "temperature_celsius")]
+    pub temperature_celsius: Option<f32>,
+    #[serde(alias = "interface_errors")]
+    pub interface_errors: Vec<InterfaceErrorEntry>,
+    #[serde(alias = "log_alerts")]
+    pub log_alerts: Vec<LogAlertEntry>,
+}
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
-    pub struct FleetHealthSummary {
-        pub total: u32,
-        pub healthy: u32,
-        pub warning: u32,
-        pub critical: u32,
-        pub unreachable: u32,
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FleetHealthSummary {
+    pub total: u32,
+    pub healthy: u32,
+    pub warning: u32,
+    pub critical: u32,
+    pub unreachable: u32,
+}
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
-    pub struct VendorHealthSummary {
-        pub vendor: String,
-        pub total: u32,
-        pub healthy: u32,
-        pub warning: u32,
-        pub critical: u32,
-        pub unreachable: u32,
-        pub avg_cpu: f32,
-        pub avg_memory: f32,
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VendorHealthSummary {
+    pub vendor: String,
+    pub total: u32,
+    pub healthy: u32,
+    pub warning: u32,
+    pub critical: u32,
+    pub unreachable: u32,
+    #[serde(alias = "avg_cpu")]
+    pub avg_cpu: f32,
+    #[serde(alias = "avg_memory")]
+    pub avg_memory: f32,
+}
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
-    pub struct FleetHealth {
-        pub devices: Vec<DeviceHealthEntry>,
-        pub summary: FleetHealthSummary,
-        pub vendor_breakdown: Vec<VendorHealthSummary>,
-        pub last_updated: String,
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FleetHealth {
+    pub devices: Vec<DeviceHealthEntry>,
+    pub summary: FleetHealthSummary,
+    #[serde(alias = "vendor_breakdown")]
+    pub vendor_breakdown: Vec<VendorHealthSummary>,
+    #[serde(alias = "last_updated")]
+    pub last_updated: String,
+}
 
 /// Retrieve aggregate fleet health data across all devices.
 ///

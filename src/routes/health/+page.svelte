@@ -24,6 +24,7 @@
 	let autoRefresh = $state(false);
 	let refreshInterval = $state(30);
 	let refreshTimer = $state<ReturnType<typeof setInterval> | null>(null);
+	let initialized = $state(false);
 
 	// --- Derived ---
 	let summary = $derived(fleetHealth.summary);
@@ -151,6 +152,20 @@
 	function toggleAutoRefresh(): void {
 		autoRefresh = !autoRefresh;
 	}
+
+	const runInitialRefresh = (() => {
+		let ran = false;
+
+		return () => {
+			if (ran) return;
+			ran = true;
+			void refreshData();
+		};
+	})();
+
+	$effect(() => {
+		runInitialRefresh();
+	});
 
 	$effect(() => {
 		// If auto-refresh is disabled, ensure any existing interval is cleared.
