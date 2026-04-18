@@ -189,12 +189,12 @@
 			.replace(/&/g, '&amp;')
 			.replace(/</g, '&lt;')
 			.replace(/>/g, '&gt;')
-			.replace(/\x1b\[32m/g, '<span style="color:#9ece6a">')
-			.replace(/\x1b\[34m/g, '<span style="color:#7aa2f7">')
-			.replace(/\x1b\[36m/g, '<span style="color:#7dcfff">')
-			.replace(/\x1b\[33m/g, '<span style="color:#e0af68">')
-			.replace(/\x1b\[31m/g, '<span style="color:#f7768e">')
-			.replace(/\x1b\[0m/g, '</span>');
+			.replaceAll('\u001b[32m', '<span style="color:#9ece6a">')
+			.replaceAll('\u001b[34m', '<span style="color:#7aa2f7">')
+			.replaceAll('\u001b[36m', '<span style="color:#7dcfff">')
+			.replaceAll('\u001b[33m', '<span style="color:#e0af68">')
+			.replaceAll('\u001b[31m', '<span style="color:#f7768e">')
+			.replaceAll('\u001b[0m', '</span>');
 	}
 </script>
 

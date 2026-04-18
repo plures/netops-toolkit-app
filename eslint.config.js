@@ -3,19 +3,35 @@ import tseslint from "typescript-eslint";
 import sveltePlugin from "eslint-plugin-svelte";
 import svelteParser from "svelte-eslint-parser";
 import globals from "globals";
-import designDojoPlugin from "@plures/design-dojo/enforce";
+
+let designDojoConfig = [];
+try {
+  const designDojoPlugin = await import("@plures/design-dojo/enforce");
+  if (designDojoPlugin?.default?.configs?.recommended) {
+    designDojoConfig = [designDojoPlugin.default.configs.recommended];
+  }
+} catch (error) {
+  if (error && typeof error === "object" && "code" in error && error.code === "ERR_MODULE_NOT_FOUND") {
+    designDojoConfig = [];
+  } else {
+    throw error;
+  }
+}
 
 export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   ...sveltePlugin.configs["flat/recommended"],
-  designDojoPlugin.configs.recommended,
+  ...designDojoConfig,
   {
     languageOptions: {
       globals: {
         ...globals.browser,
         ...globals.node,
       },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
   {
