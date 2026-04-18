@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
+	CredentialScope,
 	VaultCredential,
 	VaultResolveResult,
 	VaultSetPayload,
@@ -26,9 +27,9 @@ export async function vaultSet(payload: VaultSetPayload): Promise<VaultCredentia
 	return invoke<VaultCredential>('vault_set', { payload });
 }
 
-/** Delete a credential by its id. */
-export async function vaultDelete(id: string): Promise<void> {
-	return invoke<void>('vault_delete', { id });
+/** Delete a credential by scope and target. */
+export async function vaultDelete(scope: CredentialScope, target?: string): Promise<void> {
+	return invoke<void>('vault_delete', { scope, target: target ?? null });
 }
 
 /**

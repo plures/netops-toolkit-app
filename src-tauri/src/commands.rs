@@ -16,7 +16,7 @@
 //!   - `vault_unlock`   — unlock the vault with the master password
 //!   - `vault_list`     — list stored credentials (passwords masked)
 //!   - `vault_set`      — create or update a credential
-//!   - `vault_delete`   — delete a credential by id
+//!   - `vault_delete`   — delete a credential by scope/target
 //!   - `vault_resolve`  — preview which credential would be used for a hostname
 
 use std::path::PathBuf;
@@ -1770,28 +1770,38 @@ pub async fn vault_set(payload: VaultSetPayload) -> Result<VaultCredential, Stri
     }
 }
 
-/// Delete a credential from the vault by id.
+/// Delete a credential from the vault by scope and optional target.
 ///
-/// Calls `python3 -m netops.core.vault delete --id <id> --format json`.
+/// Calls `python3 -m netops.core.vault delete --scope <scope> [--target <target>] --format json`.
 /// Falls back silently when the sidecar is unavailable.
 #[tauri::command]
-pub async fn vault_delete(id: String) -> Result<(), String> {
-    if id.trim().is_empty() {
-        return Err("Credential id must not be empty".into());
+pub async fn vault_delete(scope: CredentialScope, target: Option<String>) -> Result<(), String> {
+    if matches!(scope, CredentialScope::Group | CredentialScope::Device)
+        && target.as_deref().map(str::trim).unwrap_or("").is_empty()
+    {
+        return Err("Target must be specified for group or device scope".into());
     }
 
-    let output = Command::new(PYTHON)
-        .args([
-            "-m",
-            "netops.core.vault",
-            "delete",
-            "--id",
-            &id,
-            "--format",
-            "json",
-        ])
-        .output()
-        .await;
+    let scope_arg = match scope {
+        CredentialScope::Default => "default",
+        CredentialScope::Group => "group",
+        CredentialScope::Device => "device",
+    };
+
+    let mut cmd = Command::new(PYTHON);
+    cmd.args([
+        "-m",
+        "netops.core.vault",
+        "delete",
+        "--scope",
+        scope_arg,
+    ]);
+    if let Some(target_value) = target.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        cmd.args(["--target", target_value]);
+    }
+    cmd.args(["--format", "json"]);
+
+    let output = cmd.output().await;
 
     if let Ok(out) = output {
         if out.status.success() {

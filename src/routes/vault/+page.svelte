@@ -270,11 +270,13 @@
 
 	async function handleConfirmDelete(): Promise<void> {
 		if (!deletingId) return;
+		const cred = credentials.find((c) => c.id === deletingId);
+		if (!cred) return;
 		loading = true;
 		errorMsg = '';
 		try {
 			const { vaultDelete } = await import('$lib/services/vault.js');
-			await vaultDelete(deletingId);
+			await vaultDelete(cred.scope, cred.target);
 		} catch {
 			// Mock: proceed anyway
 		} finally {
