@@ -1,3 +1,7 @@
+## [0.17.0] — 2026-04-18
+
+- feat: add BGP monitoring views with peer health, filters, and session history (#46) (08ea980)
+
 ## [0.16.1] — 2026-04-18
 
 - fix: harden ESLint config against missing design-dojo enforce bundle (#45) (93e7658)
