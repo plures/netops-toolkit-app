@@ -49,30 +49,15 @@
 	] as const;
 
 	const routeMap: Record<string, (typeof navItems)[number]['href']> = {
-		'/': '/',
-		'/inventory': '/inventory',
-		'/scan': '/scan',
-		'/health': '/health',
-		'/bgp': '/bgp',
-		'/vlans': '/vlans',
-		'/config': '/config',
-		'/changes': '/changes',
-		'/vault': '/vault',
-		'/ansible': '/ansible',
-		'/tunnels': '/tunnels',
-		'/terminal': '/terminal',
-		'/partitions': '/partitions',
-		'/license': '/license',
-		'/settings': '/settings',
+		...(Object.fromEntries(navItems.map(({ href }) => [href, href])) as Record<
+			string,
+			(typeof navItems)[number]['href']
+		>),
 		'/device': '/inventory'
 	};
 
 	function getActiveRoute(pathname: string): (typeof navItems)[number]['href'] | undefined {
-		if (pathname === '/') {
-			return routeMap['/'];
-		}
-
-		const rootPath = `/${pathname.split('/')[1]}`;
+		const rootPath = `/${pathname.split('/')[1] ?? ''}`;
 		return routeMap[rootPath];
 	}
 
