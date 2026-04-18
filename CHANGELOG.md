@@ -1,3 +1,7 @@
+## [0.20.0] — 2026-04-18
+
+- feat: update AppShell sidebar navigation to include all view routes (#49) (e1e42ce)
+
 ## [0.19.0] — 2026-04-18
 
 - feat: implement change management flow (plan, push, diff, rollback) across Tauri + Svelte routes (#48) (85b92fe)
