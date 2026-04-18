@@ -48,6 +48,12 @@
 			summary: 'Ad-hoc change plan',
 			requiresConfirmation: true
 		};
+		pushResult = null;
+		rollbackResult = null;
+		pushConfirm = false;
+		rollbackConfirm = false;
+		pushing = false;
+		rollingBack = false;
 		loadDiff();
 	});
 

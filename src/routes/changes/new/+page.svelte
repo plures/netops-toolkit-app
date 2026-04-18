@@ -65,12 +65,12 @@
 		{#if step === 1}
 			<div class="panel">
 				<div class="label">Devices (one per line)</div>
-				<textarea bind:value={devicesInput} rows="6"></textarea>
+				<textarea aria-label="Devices (one per line)" bind:value={devicesInput} rows="6"></textarea>
 			</div>
 		{:else if step === 2}
 			<div class="panel">
 				<div class="label">Commands (one per line)</div>
-				<textarea bind:value={commandsInput} rows="8"></textarea>
+				<textarea aria-label="Commands (one per line)" bind:value={commandsInput} rows="8"></textarea>
 			</div>
 		{:else}
 			<div class="panel">
@@ -85,7 +85,11 @@
 		<div class="actions">
 			<Button variant="outline" onclick={previousStep} disabled={step === 1}>Back</Button>
 			{#if step < 3}
-				<Button variant="solid" onclick={nextStep} disabled={step === 1 && devices.length === 0}>
+				<Button
+					variant="solid"
+					onclick={nextStep}
+					disabled={(step === 1 && devices.length === 0) || (step === 2 && commands.length === 0)}
+				>
 					Next
 				</Button>
 			{:else}
