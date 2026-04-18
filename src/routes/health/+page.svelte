@@ -153,10 +153,18 @@
 		autoRefresh = !autoRefresh;
 	}
 
+	const runInitialRefresh = (() => {
+		let ran = false;
+
+		return () => {
+			if (ran) return;
+			ran = true;
+			void refreshData();
+		};
+	})();
+
 	$effect(() => {
-		if (initialized) return;
-		initialized = true;
-		void refreshData();
+		runInitialRefresh();
 	});
 
 	$effect(() => {
