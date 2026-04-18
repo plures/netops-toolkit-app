@@ -1,3 +1,7 @@
+## [0.19.0] — 2026-04-18
+
+- feat: implement change management flow (plan, push, diff, rollback) across Tauri + Svelte routes (#48) (85b92fe)
+
 ## [0.18.0] — 2026-04-18
 
 - feat: align Vault credential deletion with scope/target contract (#47) (43259b4)
