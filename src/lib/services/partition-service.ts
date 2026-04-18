@@ -35,7 +35,7 @@ export async function createPartition(
 	_state: PartitionState,
 	_options?: { tags?: string[]; classification?: Record<string, string> },
 ): Promise<Partition | null> {
-	// TODO: invoke('create_partition', { displayName, state, ...options })
+	// TODO: invoke('create_partition', { _displayName, _state, ..._options })
 	return null;
 }
 

@@ -10,8 +10,12 @@ try {
   if (designDojoPlugin?.default?.configs?.recommended) {
     designDojoConfig = [designDojoPlugin.default.configs.recommended];
   }
-} catch {
-  designDojoConfig = [];
+} catch (error) {
+  if (error && typeof error === "object" && "code" in error && error.code === "ERR_MODULE_NOT_FOUND") {
+    designDojoConfig = [];
+  } else {
+    throw error;
+  }
 }
 
 export default tseslint.config(
