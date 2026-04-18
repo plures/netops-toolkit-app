@@ -6,6 +6,8 @@
 //!   - `cancel_scan`    — cancel the running scan
 //!   - `load_inventory` — load a JSON inventory file from disk
 //!   - `get_fleet_health` — aggregate health across all devices
+//!   - `get_bgp_summary`  — summarize BGP peers across devices
+//!   - `get_bgp_neighbors` — detailed BGP neighbor history for a device
 //!   - `backup_config`  — trigger a config backup for a device
 //!   - `list_backups`   — list stored config backups
 //!   - `diff_configs`   — compute a diff between two config versions
@@ -851,6 +853,280 @@ fn mock_fleet_health() -> FleetHealth {
         devices,
         last_updated: "2026-03-27T06:15:00Z".into(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// BGP monitoring payload types & commands
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BgpSummaryPeer {
+    pub hostname: String,
+    pub neighbor: String,
+    #[serde(alias = "remote_as")]
+    pub remote_as: u32,
+    pub state: String,
+    #[serde(alias = "prefixes_received")]
+    pub prefixes_received: u32,
+    #[serde(alias = "last_change")]
+    pub last_change: String,
+    #[serde(alias = "flap_count")]
+    pub flap_count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BgpSessionEvent {
+    pub timestamp: String,
+    pub state: String,
+    pub message: String,
+    #[serde(alias = "prefixes_received")]
+    pub prefixes_received: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BgpNeighborDetail {
+    pub hostname: String,
+    pub neighbor: String,
+    #[serde(alias = "remote_as")]
+    pub remote_as: u32,
+    pub state: String,
+    #[serde(alias = "prefixes_received")]
+    pub prefixes_received: u32,
+    #[serde(alias = "last_change")]
+    pub last_change: String,
+    #[serde(alias = "flap_count")]
+    pub flap_count: u32,
+    pub history: Vec<BgpSessionEvent>,
+}
+
+/// Get BGP peer summary, optionally filtered by hostname.
+///
+/// Calls `python3 -m netops.parsers.bgp`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn get_bgp_summary(hostname: Option<String>) -> Result<Vec<BgpSummaryPeer>, String> {
+    let mut args = vec![
+        "-m".to_string(),
+        "netops.parsers.bgp".to_string(),
+        "--format".to_string(),
+        "json".to_string(),
+    ];
+
+    if let Some(ref h) = hostname {
+        if h.trim().is_empty() {
+            return Err("Hostname filter must not be empty".into());
+        }
+        args.push("--hostname".into());
+        args.push(h.clone());
+    }
+
+    let output = Command::new(PYTHON).args(&args).output().await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(summary) = serde_json::from_str::<Vec<BgpSummaryPeer>>(&text) {
+                return Ok(summary);
+            }
+        }
+    }
+
+    Ok(mock_bgp_summary(hostname.as_deref()))
+}
+
+/// Get detailed BGP neighbor session information for a hostname.
+///
+/// Calls `python3 -m netops.check.bgp`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn get_bgp_neighbors(hostname: String) -> Result<Vec<BgpNeighborDetail>, String> {
+    if hostname.trim().is_empty() {
+        return Err("Hostname must not be empty".into());
+    }
+
+    let output = Command::new(PYTHON)
+        .args([
+            "-m",
+            "netops.check.bgp",
+            "--hostname",
+            &hostname,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(neighbors) = serde_json::from_str::<Vec<BgpNeighborDetail>>(&text) {
+                return Ok(neighbors);
+            }
+        }
+    }
+
+    Ok(mock_bgp_neighbors(&hostname))
+}
+
+fn mock_bgp_summary(hostname: Option<&str>) -> Vec<BgpSummaryPeer> {
+    let all = vec![
+        BgpSummaryPeer {
+            hostname: "core-rtr-01".into(),
+            neighbor: "10.0.0.2".into(),
+            remote_as: 65001,
+            state: "Established".into(),
+            prefixes_received: 1024,
+            last_change: "2026-04-18T07:20:00Z".into(),
+            flap_count: 0,
+        },
+        BgpSummaryPeer {
+            hostname: "core-rtr-01".into(),
+            neighbor: "172.16.0.1".into(),
+            remote_as: 65003,
+            state: "Active".into(),
+            prefixes_received: 0,
+            last_change: "2026-04-18T08:05:00Z".into(),
+            flap_count: 3,
+        },
+        BgpSummaryPeer {
+            hostname: "edge-rtr-01".into(),
+            neighbor: "192.168.1.1".into(),
+            remote_as: 65002,
+            state: "Idle".into(),
+            prefixes_received: 0,
+            last_change: "2026-04-18T08:10:00Z".into(),
+            flap_count: 4,
+        },
+        BgpSummaryPeer {
+            hostname: "edge-rtr-02".into(),
+            neighbor: "10.0.2.2".into(),
+            remote_as: 65020,
+            state: "Established".into(),
+            prefixes_received: 768,
+            last_change: "2026-04-18T06:58:00Z".into(),
+            flap_count: 1,
+        },
+    ];
+
+    if let Some(h) = hostname {
+        all.into_iter().filter(|peer| peer.hostname == h).collect()
+    } else {
+        all
+    }
+}
+
+fn mock_bgp_neighbors(hostname: &str) -> Vec<BgpNeighborDetail> {
+    let all = vec![
+        BgpNeighborDetail {
+            hostname: "core-rtr-01".into(),
+            neighbor: "10.0.0.2".into(),
+            remote_as: 65001,
+            state: "Established".into(),
+            prefixes_received: 1024,
+            last_change: "2026-04-18T07:20:00Z".into(),
+            flap_count: 0,
+            history: vec![
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T07:20:00Z".into(),
+                    state: "Established".into(),
+                    message: "Session established".into(),
+                    prefixes_received: 1024,
+                },
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T06:10:00Z".into(),
+                    state: "Connect".into(),
+                    message: "TCP handshake started".into(),
+                    prefixes_received: 0,
+                },
+            ],
+        },
+        BgpNeighborDetail {
+            hostname: "core-rtr-01".into(),
+            neighbor: "172.16.0.1".into(),
+            remote_as: 65003,
+            state: "Active".into(),
+            prefixes_received: 0,
+            last_change: "2026-04-18T08:05:00Z".into(),
+            flap_count: 3,
+            history: vec![
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T08:05:00Z".into(),
+                    state: "Active".into(),
+                    message: "Retrying neighbor connection".into(),
+                    prefixes_received: 0,
+                },
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T08:03:00Z".into(),
+                    state: "Idle".into(),
+                    message: "Hold timer expired".into(),
+                    prefixes_received: 0,
+                },
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T08:00:00Z".into(),
+                    state: "Established".into(),
+                    message: "Session recovered".into(),
+                    prefixes_received: 511,
+                },
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T07:57:00Z".into(),
+                    state: "Idle".into(),
+                    message: "Neighbor reset by peer".into(),
+                    prefixes_received: 0,
+                },
+            ],
+        },
+        BgpNeighborDetail {
+            hostname: "edge-rtr-01".into(),
+            neighbor: "192.168.1.1".into(),
+            remote_as: 65002,
+            state: "Idle".into(),
+            prefixes_received: 0,
+            last_change: "2026-04-18T08:10:00Z".into(),
+            flap_count: 4,
+            history: vec![
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T08:10:00Z".into(),
+                    state: "Idle".into(),
+                    message: "Authentication failure".into(),
+                    prefixes_received: 0,
+                },
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T08:07:00Z".into(),
+                    state: "Active".into(),
+                    message: "Session retry".into(),
+                    prefixes_received: 0,
+                },
+            ],
+        },
+        BgpNeighborDetail {
+            hostname: "edge-rtr-02".into(),
+            neighbor: "10.0.2.2".into(),
+            remote_as: 65020,
+            state: "Established".into(),
+            prefixes_received: 768,
+            last_change: "2026-04-18T06:58:00Z".into(),
+            flap_count: 1,
+            history: vec![
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T06:58:00Z".into(),
+                    state: "Established".into(),
+                    message: "Session established".into(),
+                    prefixes_received: 768,
+                },
+                BgpSessionEvent {
+                    timestamp: "2026-04-18T06:50:00Z".into(),
+                    state: "Idle".into(),
+                    message: "Session reset during maintenance".into(),
+                    prefixes_received: 0,
+                },
+            ],
+        },
+    ];
+
+    all.into_iter().filter(|neighbor| neighbor.hostname == hostname).collect()
 }
 
 // ---------------------------------------------------------------------------

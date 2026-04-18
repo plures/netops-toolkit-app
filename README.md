@@ -130,6 +130,7 @@ Credential table with scope badges, resolution preview with hierarchy chain disp
 | **Inventory** | Device table with filtering, sorting, vendor badges | ✅ | ✅ |
 | **Scan Runner** | Launch scans, live progress, streaming results | ✅ | ✅ |
 | **Device Detail** | Interfaces, health, BGP peers, running config (tabbed) | ✅ | ✅ |
+| **BGP Monitoring** | Peer status, prefix counts, filters, session flap history | ✅ | ✅ |
 | **Config Browser** | Version history, content viewer | ✅ | ✅ |
 | **Config Diff** | Unified diff with rollback support | ✅ | ✅ |
 | **Fleet Health** | CPU/memory/temp monitoring, interface errors, log alerts | ✅ | ✅ |
