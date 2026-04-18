@@ -1,3 +1,7 @@
+## [0.16.0] — 2026-04-18
+
+- feat: add VLAN management view with inventory, consistency checks, and trunk analysis (#43) (82fb1d2)
+
 ## [0.15.1] — 2026-04-18
 
 - fix(health): align Tauri health payload casing with UI models and hydrate dashboard on load (#42) (cdde787)
