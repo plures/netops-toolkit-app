@@ -2170,3 +2170,259 @@ fn mock_generate_playbook(
         template: template.to_string(),
     }
 }
+
+// ---------------------------------------------------------------------------
+// VLAN payload types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VlanInventoryEntry {
+    pub hostname: String,
+    pub vlan_id: u16,
+    pub vlan_name: String,
+    pub state: String,
+    pub interface_count: u32,
+    pub trunk_count: u32,
+    pub trunk_interfaces: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VlanConsistencyIssue {
+    pub vlan_id: u16,
+    pub vlan_name: String,
+    pub status: String,
+    pub devices: Vec<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VlanConsistencyReport {
+    pub checked_devices: u32,
+    pub checked_vlans: u32,
+    pub consistent: u32,
+    pub warnings: u32,
+    pub critical: u32,
+    pub issues: Vec<VlanConsistencyIssue>,
+}
+
+// ---------------------------------------------------------------------------
+// VLAN commands
+// ---------------------------------------------------------------------------
+
+/// Get VLAN inventory, optionally filtered by hostname.
+///
+/// Calls `python3 -m netops.parsers.vlan`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn get_vlans(hostname: Option<String>) -> Result<Vec<VlanInventoryEntry>, String> {
+    let mut args = vec![
+        "-m".to_string(),
+        "netops.parsers.vlan".to_string(),
+        "--format".to_string(),
+        "json".to_string(),
+    ];
+
+    if let Some(ref h) = hostname {
+        if h.trim().is_empty() {
+            return Err("Hostname filter must not be empty".into());
+        }
+        args.push("--hostname".into());
+        args.push(h.clone());
+    }
+
+    let output = Command::new(PYTHON).args(&args).output().await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(vlans) = serde_json::from_str::<Vec<VlanInventoryEntry>>(&text) {
+                return Ok(vlans);
+            }
+        }
+    }
+
+    Ok(mock_vlan_inventory(hostname.as_deref()))
+}
+
+/// Check VLAN consistency across selected devices.
+///
+/// Calls `python3 -m netops.check.vlan`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn check_vlan_consistency(devices: Vec<String>) -> Result<VlanConsistencyReport, String> {
+    if devices.is_empty() {
+        return Err("At least one device must be selected".into());
+    }
+
+    if devices.iter().any(|d| d.trim().is_empty()) {
+        return Err("Device names must not be empty".into());
+    }
+
+    let mut args = vec![
+        "-m".to_string(),
+        "netops.check.vlan".to_string(),
+        "--format".to_string(),
+        "json".to_string(),
+    ];
+
+    for device in &devices {
+        args.push("--device".into());
+        args.push(device.clone());
+    }
+
+    let output = Command::new(PYTHON).args(&args).output().await;
+
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(report) = serde_json::from_str::<VlanConsistencyReport>(&text) {
+                return Ok(report);
+            }
+        }
+    }
+
+    Ok(mock_vlan_consistency_report(&devices))
+}
+
+// ---------------------------------------------------------------------------
+// VLAN mock helpers
+// ---------------------------------------------------------------------------
+
+fn mock_vlan_inventory(hostname: Option<&str>) -> Vec<VlanInventoryEntry> {
+    let all = vec![
+        VlanInventoryEntry {
+            hostname: "core-rtr-01".into(),
+            vlan_id: 10,
+            vlan_name: "Users".into(),
+            state: "active".into(),
+            interface_count: 24,
+            trunk_count: 2,
+            trunk_interfaces: vec!["Gi0/1".into(), "Gi0/2".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "core-rtr-01".into(),
+            vlan_id: 20,
+            vlan_name: "Voice".into(),
+            state: "active".into(),
+            interface_count: 12,
+            trunk_count: 2,
+            trunk_interfaces: vec!["Gi0/1".into(), "Gi0/2".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "edge-rtr-01".into(),
+            vlan_id: 10,
+            vlan_name: "Users".into(),
+            state: "active".into(),
+            interface_count: 16,
+            trunk_count: 1,
+            trunk_interfaces: vec!["port-1/1/1".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "edge-rtr-01".into(),
+            vlan_id: 20,
+            vlan_name: "Voice".into(),
+            state: "active".into(),
+            interface_count: 8,
+            trunk_count: 1,
+            trunk_interfaces: vec!["port-1/1/1".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "leaf-sw-01".into(),
+            vlan_id: 10,
+            vlan_name: "Users".into(),
+            state: "active".into(),
+            interface_count: 32,
+            trunk_count: 3,
+            trunk_interfaces: vec!["Ethernet47".into(), "Ethernet48".into(), "Port-Channel1".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "leaf-sw-01".into(),
+            vlan_id: 20,
+            vlan_name: "Voice".into(),
+            state: "active".into(),
+            interface_count: 32,
+            trunk_count: 3,
+            trunk_interfaces: vec!["Ethernet47".into(), "Ethernet48".into(), "Port-Channel1".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "leaf-sw-02".into(),
+            vlan_id: 10,
+            vlan_name: "Users".into(),
+            state: "active".into(),
+            interface_count: 28,
+            trunk_count: 2,
+            trunk_interfaces: vec!["Ethernet47".into(), "Port-Channel1".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "leaf-sw-02".into(),
+            vlan_id: 20,
+            vlan_name: "Voice-Phones".into(),
+            state: "active".into(),
+            interface_count: 28,
+            trunk_count: 2,
+            trunk_interfaces: vec!["Ethernet47".into(), "Port-Channel1".into()],
+        },
+        VlanInventoryEntry {
+            hostname: "leaf-sw-02".into(),
+            vlan_id: 999,
+            vlan_name: "Unused".into(),
+            state: "suspended".into(),
+            interface_count: 0,
+            trunk_count: 0,
+            trunk_interfaces: vec![],
+        },
+    ];
+
+    if let Some(h) = hostname {
+        all.into_iter().filter(|entry| entry.hostname == h).collect()
+    } else {
+        all
+    }
+}
+
+fn mock_vlan_consistency_report(devices: &[String]) -> VlanConsistencyReport {
+    let normalized_devices: Vec<String> = if devices.is_empty() {
+        vec![
+            "core-rtr-01".into(),
+            "edge-rtr-01".into(),
+            "leaf-sw-01".into(),
+            "leaf-sw-02".into(),
+        ]
+    } else {
+        devices.to_vec()
+    };
+
+    VlanConsistencyReport {
+        checked_devices: normalized_devices.len() as u32,
+        checked_vlans: 4,
+        consistent: 2,
+        warnings: 1,
+        critical: 1,
+        issues: vec![
+            VlanConsistencyIssue {
+                vlan_id: 10,
+                vlan_name: "Users".into(),
+                status: "consistent".into(),
+                devices: normalized_devices.clone(),
+                message: "VLAN name and state are aligned on all checked devices.".into(),
+            },
+            VlanConsistencyIssue {
+                vlan_id: 20,
+                vlan_name: "Voice".into(),
+                status: "critical".into(),
+                devices: vec!["core-rtr-01".into(), "edge-rtr-01".into(), "leaf-sw-02".into()],
+                message: "VLAN ID 20 has mismatched names (Voice vs Voice-Phones).".into(),
+            },
+            VlanConsistencyIssue {
+                vlan_id: 999,
+                vlan_name: "Unused".into(),
+                status: "warning".into(),
+                devices: vec!["leaf-sw-02".into()],
+                message: "VLAN present on a subset of devices only.".into(),
+            },
+        ],
+    }
+}

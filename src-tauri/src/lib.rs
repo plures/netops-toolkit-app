@@ -32,6 +32,8 @@ pub fn run() {
             commands::list_backups,
             commands::diff_configs,
             commands::rollback_config,
+            commands::get_vlans,
+            commands::check_vlan_consistency,
             commands::vault_init,
             commands::vault_unlock,
             commands::vault_list,
