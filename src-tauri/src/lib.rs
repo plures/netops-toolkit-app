@@ -28,6 +28,8 @@ pub fn run() {
             commands::get_device_detail,
             commands::get_device_health,
             commands::get_fleet_health,
+            commands::get_bgp_summary,
+            commands::get_bgp_neighbors,
             commands::backup_config,
             commands::list_backups,
             commands::diff_configs,
