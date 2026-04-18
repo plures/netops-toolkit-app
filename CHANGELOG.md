@@ -1,3 +1,7 @@
+## [0.15.1] — 2026-04-18
+
+- fix(health): align Tauri health payload casing with UI models and hydrate dashboard on load (#42) (cdde787)
+
 ## [0.15.0] — 2026-04-18
 
 - feat(lifecycle v11): smart CI failure handling — infra vs code (b239ce0)
