@@ -1,3 +1,7 @@
+## [0.21.0] — 2026-04-18
+
+- feat(lifecycle v12): auto-release when milestone completes (76c1b5a)
+
 ## [0.20.0] — 2026-04-18
 
 - feat: update AppShell sidebar navigation to include all view routes (#49) (e1e42ce)
