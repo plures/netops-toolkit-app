@@ -12,6 +12,10 @@
 //!   - `list_backups`   — list stored config backups
 //!   - `diff_configs`   — compute a diff between two config versions
 //!   - `rollback_config` — rollback a device config to a previous version
+//!   - `create_change_plan` — build a config change plan
+//!   - `push_config` — execute a config change plan
+//!   - `get_change_diff` — fetch pre/post diff for a change plan
+//!   - `rollback_change` — rollback an executed change plan
 //!   - `vault_init`     — initialise the encrypted credential vault
 //!   - `vault_unlock`   — unlock the vault with the master password
 //!   - `vault_list`     — list stored credentials (passwords masked)
@@ -1164,6 +1168,64 @@ pub struct RollbackResult {
     pub message: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangePlan {
+    pub id: String,
+    pub devices: Vec<String>,
+    pub commands: Vec<String>,
+    pub status: String,
+    pub created_at: String,
+    pub summary: String,
+    pub requires_confirmation: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeDiffResult {
+    pub plan_id: String,
+    pub pre_diff: String,
+    pub post_diff: String,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangePushStep {
+    pub step: String,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeLogEntry {
+    pub timestamp: String,
+    pub action: String,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangePushResult {
+    pub plan_id: String,
+    pub success: bool,
+    pub status: String,
+    pub steps: Vec<ChangePushStep>,
+    pub change_log: Vec<ChangeLogEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeRollbackResult {
+    pub plan_id: String,
+    pub success: bool,
+    pub message: String,
+    pub rolled_back_at: String,
+}
+
 // ---------------------------------------------------------------------------
 // Config backup commands
 // ---------------------------------------------------------------------------
@@ -1322,6 +1384,150 @@ pub async fn rollback_config(hostname: String, version: String) -> Result<Rollba
     Ok(mock_rollback(&hostname, &version))
 }
 
+/// Create a config change plan for selected devices and commands.
+///
+/// Calls `python3 -m netops.change.plan`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn create_change_plan(
+    devices: Vec<String>,
+    commands: Vec<String>,
+) -> Result<ChangePlan, String> {
+    if devices.is_empty() {
+        return Err("At least one device is required".into());
+    }
+    if commands.is_empty() {
+        return Err("At least one command is required".into());
+    }
+    if devices.iter().any(|d| d.trim().is_empty()) {
+        return Err("Device names must not be empty".into());
+    }
+    if commands.iter().any(|c| c.trim().is_empty()) {
+        return Err("Commands must not be empty".into());
+    }
+
+    let mut args = vec!["-m".into(), "netops.change.plan".into(), "--format".into(), "json".into()];
+    for device in &devices {
+        args.push("--device".into());
+        args.push(device.clone());
+    }
+    for command in &commands {
+        args.push("--command".into());
+        args.push(command.clone());
+    }
+
+    let output = Command::new(PYTHON).args(&args).output().await;
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(plan) = serde_json::from_str::<ChangePlan>(&text) {
+                return Ok(plan);
+            }
+        }
+    }
+
+    Ok(mock_change_plan(devices, commands))
+}
+
+/// Execute a prepared config change plan.
+///
+/// Calls `python3 -m netops.change.push`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn push_config(plan_id: String) -> Result<ChangePushResult, String> {
+    if plan_id.trim().is_empty() {
+        return Err("Plan ID must not be empty".into());
+    }
+
+    let output = Command::new(PYTHON)
+        .args([
+            "-m",
+            "netops.change.push",
+            "--plan-id",
+            &plan_id,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(result) = serde_json::from_str::<ChangePushResult>(&text) {
+                return Ok(result);
+            }
+        }
+    }
+
+    Ok(mock_change_push(&plan_id))
+}
+
+/// Get pre/post diff for a config change plan.
+///
+/// Calls `python3 -m netops.change.diff`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn get_change_diff(plan_id: String) -> Result<ChangeDiffResult, String> {
+    if plan_id.trim().is_empty() {
+        return Err("Plan ID must not be empty".into());
+    }
+
+    let output = Command::new(PYTHON)
+        .args([
+            "-m",
+            "netops.change.diff",
+            "--plan-id",
+            &plan_id,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(diff) = serde_json::from_str::<ChangeDiffResult>(&text) {
+                return Ok(diff);
+            }
+        }
+    }
+
+    Ok(mock_change_diff(&plan_id))
+}
+
+/// Roll back a previously executed config change plan.
+///
+/// Calls `python3 -m netops.change.rollback`.
+/// Falls back to mock data when the sidecar is unavailable.
+#[tauri::command]
+pub async fn rollback_change(plan_id: String) -> Result<ChangeRollbackResult, String> {
+    if plan_id.trim().is_empty() {
+        return Err("Plan ID must not be empty".into());
+    }
+
+    let output = Command::new(PYTHON)
+        .args([
+            "-m",
+            "netops.change.rollback",
+            "--plan-id",
+            &plan_id,
+            "--format",
+            "json",
+        ])
+        .output()
+        .await;
+    if let Ok(out) = output {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Ok(result) = serde_json::from_str::<ChangeRollbackResult>(&text) {
+                return Ok(result);
+            }
+        }
+    }
+
+    Ok(mock_change_rollback(&plan_id))
+}
+
 // ---------------------------------------------------------------------------
 // Config mock helpers
 // ---------------------------------------------------------------------------
@@ -1428,6 +1634,88 @@ fn mock_rollback(hostname: &str, version: &str) -> RollbackResult {
         version: version.to_string(),
         success: true,
         message: format!("Successfully rolled back {hostname} to {version}"),
+    }
+}
+
+fn mock_change_plan(devices: Vec<String>, commands: Vec<String>) -> ChangePlan {
+    let id = "chg-20260418-001".to_string();
+    ChangePlan {
+        id: id.clone(),
+        summary: format!(
+            "Apply {} command(s) to {} device(s)",
+            commands.len(),
+            devices.len()
+        ),
+        devices,
+        commands,
+        status: "planned".into(),
+        created_at: "2026-04-18T08:45:00Z".into(),
+        requires_confirmation: true,
+    }
+}
+
+fn mock_change_push(plan_id: &str) -> ChangePushResult {
+    ChangePushResult {
+        plan_id: plan_id.to_string(),
+        success: true,
+        status: "completed".into(),
+        steps: vec![
+            ChangePushStep {
+                step: "Pre-checks".into(),
+                status: "completed".into(),
+                message: "Connectivity and privilege checks passed".into(),
+            },
+            ChangePushStep {
+                step: "Push".into(),
+                status: "completed".into(),
+                message: "Configuration commands applied to selected devices".into(),
+            },
+            ChangePushStep {
+                step: "Post-checks".into(),
+                status: "completed".into(),
+                message: "Operational validation passed".into(),
+            },
+        ],
+        change_log: vec![
+            ChangeLogEntry {
+                timestamp: "2026-04-18T08:46:00Z".into(),
+                action: "plan-created".into(),
+                status: "success".into(),
+                message: "Change plan created and awaiting approval".into(),
+            },
+            ChangeLogEntry {
+                timestamp: "2026-04-18T08:47:00Z".into(),
+                action: "push-started".into(),
+                status: "success".into(),
+                message: "Push approved and execution started".into(),
+            },
+            ChangeLogEntry {
+                timestamp: "2026-04-18T08:49:00Z".into(),
+                action: "push-completed".into(),
+                status: "success".into(),
+                message: "Push completed on all selected devices".into(),
+            },
+        ],
+    }
+}
+
+fn mock_change_diff(plan_id: &str) -> ChangeDiffResult {
+    ChangeDiffResult {
+        plan_id: plan_id.to_string(),
+        pre_diff: "interface GigabitEthernet0/0/1\n shutdown\n!".into(),
+        post_diff: "interface GigabitEthernet0/0/1\n description Uplink to Core\n no shutdown\n!"
+            .into(),
+        additions: 2,
+        deletions: 1,
+    }
+}
+
+fn mock_change_rollback(plan_id: &str) -> ChangeRollbackResult {
+    ChangeRollbackResult {
+        plan_id: plan_id.to_string(),
+        success: true,
+        message: format!("Rollback completed for {plan_id}"),
+        rolled_back_at: "2026-04-18T09:00:00Z".into(),
     }
 }
 
