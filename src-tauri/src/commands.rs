@@ -1796,8 +1796,11 @@ pub async fn vault_delete(scope: CredentialScope, target: Option<String>) -> Res
         "--scope",
         scope_arg,
     ]);
-    if let Some(target_value) = target.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
-        cmd.args(["--target", target_value]);
+    if let Some(target_value) = target.as_deref() {
+        let trimmed = target_value.trim();
+        if !trimmed.is_empty() {
+            cmd.args(["--target", trimmed]);
+        }
     }
     cmd.args(["--format", "json"]);
 
