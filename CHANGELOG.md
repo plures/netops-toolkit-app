@@ -1,3 +1,7 @@
+## [0.18.0] — 2026-04-18
+
+- feat: align Vault credential deletion with scope/target contract (#47) (43259b4)
+
 ## [0.17.0] — 2026-04-18
 
 - feat: add BGP monitoring views with peer health, filters, and session history (#46) (08ea980)
