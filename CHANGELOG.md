@@ -1,3 +1,7 @@
+## [0.16.1] — 2026-04-18
+
+- fix: harden ESLint config against missing design-dojo enforce bundle (#45) (93e7658)
+
 ## [0.16.0] — 2026-04-18
 
 - feat: add VLAN management view with inventory, consistency checks, and trunk analysis (#43) (82fb1d2)
