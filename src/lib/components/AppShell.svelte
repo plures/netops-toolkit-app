@@ -48,15 +48,18 @@
 		{ icon: 'settings', label: 'Settings', href: '/settings' }
 	] as const;
 
-	const routeMap: Record<string, (typeof navItems)[number]['href']> = {
-		...(Object.fromEntries(navItems.map(({ href }) => [href, href])) as Record<
-			string,
-			(typeof navItems)[number]['href']
-		>),
-		'/device': '/inventory'
-	};
+	type NavHref = (typeof navItems)[number]['href'];
 
-	function getActiveRoute(pathname: string): (typeof navItems)[number]['href'] | undefined {
+	const routeMap: Partial<Record<string, NavHref>> = navItems.reduce<
+		Partial<Record<string, NavHref>>
+	>((routes, { href }) => {
+		routes[href] = href;
+		return routes;
+	}, {
+		'/device': '/inventory'
+	});
+
+	function getActiveRoute(pathname: string): NavHref | undefined {
 		const rootPath = `/${pathname.split('/')[1] ?? ''}`;
 		return routeMap[rootPath];
 	}
