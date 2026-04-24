@@ -1,29 +1,30 @@
 # netops-toolkit-app Roadmap
 
-## Role in Plures Ecosystem
-netops-toolkit-app is the GUI/TUI product shell for netops-toolkit, showcasing the Plures stack (Svelte 5, Tauri 2, design-dojo, Praxis, PluresDB). It serves as both a real operator console and a dogfood platform for the design-once-run-everywhere UI model.
+## Role in OASIS
+netops-toolkit-app is the operator console that proves the OASIS stack in the field: a local‑first, privacy‑preserving UI that orchestrates agents (Pares Agens), enforces rules (Praxis), and persists data (PluresDB). It is both a real network ops product and a showcase application for multi‑surface (GUI + TUI) experiences running on the OASIS substrate.
 
 ## Current State
-The app includes a working Svelte 5 UI with routes for inventory, scans, health, and settings. TUI mode is documented via the svelte-ratatui adapter, and screenshots show the core views. The Python backend runs as a Tauri sidecar, but data wiring, workflow depth, and device detail views are still thin.
+The Svelte 5 + Tauri 2 app renders a rich GUI and a TUI mode with documented screens. The Python sidecar is wired, but deep workflows (scan → persist → analyze → diff → policy enforcement) are still shallow. No open issues are currently tracked in this repo.
 
-## Milestones
+## Phases
 
-### Near-term (Q2 2026)
-- Finish inventory dashboard wiring (live data from netops-toolkit scans).
-- Implement scan runner UX end-to-end: launch, progress, and result ingestion.
-- Build device detail view (interfaces, neighbors, health summary).
-- TUI mode polish: keyboard navigation, focus states, status bar.
-- Add basic persistence via PluresDB for scan history.
+### Phase 0 — Stabilize the shell (Now)
+- Harden routing, navigation, and shared view components for GUI/TUI parity.
+- Normalize data contracts between the UI and netops-toolkit sidecar.
+- Add minimal local persistence (PluresDB) for scan history and configs.
 
-### Mid-term (Q3–Q4 2026)
-- Introduce job scheduling (recurring scans, retention policies).
-- Add multi-tenant profiles and credential vault integration.
-- Expand health view to show trending metrics and alerts.
-- Export reports (CSV/PDF) directly from the UI.
-- Add guided workflows (backup, diff, safe push).
+### Phase 1 — OASIS‑aligned operator workflows
+- End‑to‑end scan runner: launch → live progress → results ingestion.
+- Device detail view with interface health, neighbors, and config snapshot.
+- Config history + diff + rollback flows backed by PluresDB.
+- Praxis‑enforced safety checks before any change operation.
 
-### Long-term
-- Full offline-first operator console with sync across devices.
-- Plugin system for custom scan modules and vendor packs.
-- Advanced topology visualization and dependency mapping.
-- Integrate with broader Plures governance (Praxis rules + Chronos history).
+### Phase 2 — Multi‑agent orchestration
+- Pares Agens workflows (backup, compliance check, safe‑push) as first‑class UI actions.
+- Agent status dashboard and job queue visualization.
+- Local‑first audit trail (Chronos) for every action.
+
+### Phase 3 — Commercial hardening
+- Plugin system for vendor packs and custom workflows.
+- Offline‑first sync model for multi‑site operators.
+- Packaging polish: signed builds, auto‑update, telemetry opt‑in.
