@@ -1,6 +1,6 @@
 # netops-toolkit-app
 
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE)
+[![License: BSL-1.1](https://img.shields.io/badge/License-BSL--1.1-blue.svg)](LICENSE) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
 
 Network operations TUI/GUI built with **Svelte 5 + Tauri 2 + design-dojo**.
 
@@ -158,8 +158,6 @@ npm test             # Run tests
 
 ## License
 
-This project is licensed under the [Business Source License 1.1](LICENSE).
 
-- **Personal / non-commercial use**: Free, always
-- **Commercial use**: Requires a valid license key ([tiers & pricing](docs/admin-guide.md))
-- **Change date**: March 28, 2030 — this version becomes Apache 2.0
+Dual-licensed under [BSL-1.1](LICENSE) and [MIT](LICENSE-MIT). You may choose either license at your option.
+
