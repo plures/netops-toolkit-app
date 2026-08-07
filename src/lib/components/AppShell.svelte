@@ -2,14 +2,14 @@
 	import { page } from '$app/stores';
 	import type { Snippet } from 'svelte';
 	import { partitionStore } from '$lib/stores/partition-store.svelte.js';
+	import { tuiState } from '$lib/stores/tui.svelte.js';
+	import { navItems, isRouteActive } from '$lib/navigation/index.js';
 
 	interface Props {
-		/** Render in TUI (terminal) mode instead of GUI mode. */
-		tui?: boolean;
 		children: Snippet;
 	}
 
-	let { tui = false, children }: Props = $props();
+	let { children }: Props = $props();
 
 	// SVG icon paths (24x24 viewBox, fill-based). Migrate to @plures/design-dojo Icon once published.
 	const iconPaths: Record<string, string> = {
@@ -30,46 +30,12 @@
 		'settings':     'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84a.48.48 0 00-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.48.48 0 00.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z',
 	};
 
-	const navItems = [
-		{ icon: 'dashboard', label: 'Dashboard', href: '/' },
-		{ icon: 'inventory', label: 'Inventory', href: '/inventory' },
-		{ icon: 'scan', label: 'Scan', href: '/scan' },
-		{ icon: 'health', label: 'Health', href: '/health' },
-		{ icon: 'bgp', label: 'BGP', href: '/bgp' },
-		{ icon: 'vlan', label: 'VLANs', href: '/vlans' },
-		{ icon: 'config', label: 'Config', href: '/config' },
-		{ icon: 'changes', label: 'Changes', href: '/changes' },
-		{ icon: 'vault', label: 'Vault', href: '/vault' },
-		{ icon: 'ansible', label: 'Ansible', href: '/ansible' },
-		{ icon: 'tunnel', label: 'Tunnels', href: '/tunnels' },
-		{ icon: 'terminal', label: 'Terminal', href: '/terminal' },
-		{ icon: 'partition', label: 'Partitions', href: '/partitions' },
-		{ icon: 'license', label: 'License', href: '/license' },
-		{ icon: 'settings', label: 'Settings', href: '/settings' }
-	] as const;
-
-	type NavHref = (typeof navItems)[number]['href'];
-
-	const routeMap: Partial<Record<string, NavHref>> = navItems.reduce<
-		Partial<Record<string, NavHref>>
-	>((routes, { href }) => {
-		routes[href] = href;
-		return routes;
-	}, {
-		'/device': '/inventory'
-	});
-
-	function getActiveRoute(pathname: string): NavHref | undefined {
-		const rootPath = `/${pathname.split('/')[1] ?? ''}`;
-		return routeMap[rootPath];
-	}
-
 	function isActive(href: string): boolean {
-		return getActiveRoute($page.url.pathname) === href;
+		return isRouteActive($page.url.pathname, href);
 	}
 </script>
 
-{#if tui}
+{#if tuiState.enabled}
 	<div class="app-shell tui" role="application">
 		<nav class="tui-sidebar" aria-label="Main navigation">
 			<ul role="list">
