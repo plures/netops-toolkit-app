@@ -1,3 +1,9 @@
+## [0.27.0] — 2026-08-07
+
+- feat: normalize data contracts between UI and netops-toolkit sidecar (#63) (5c2185b)
+- feat: praxis-enforced safety checks before change operations (#66) (105d96d)
+- feat(config): config history + diff + rollback flows backed by PluresDB (#65) (010d0b4)
+
 ## [0.25.0] — 2026-08-07
 
 - feat(scan): add end-to-end scan runner (launch → progress → results ingestion) (#62) (e8b550c)
