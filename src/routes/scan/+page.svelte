@@ -190,9 +190,10 @@
 		mockScan.status = 'complete';
 	}
 
-	function resetScan() {
+	async function resetScan() {
 		if (useTauri) {
-			scanRunner.cancel();
+			await scanRunner.cancel();
+			scanRunner.reset();
 			return;
 		}
 		clearInterval(scanInterval!);
