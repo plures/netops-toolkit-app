@@ -81,7 +81,7 @@ export function getActiveRoute(pathname: string): NavHref | undefined {
 /**
  * Check whether a specific nav href is active for the given pathname.
  */
-export function isRouteActive(pathname: string, href: string): boolean {
+export function isRouteActive(pathname: string, href: NavHref): boolean {
 	return getActiveRoute(pathname) === href;
 }
 
