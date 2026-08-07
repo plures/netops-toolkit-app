@@ -193,7 +193,7 @@
 	async function resetScan() {
 		if (useTauri) {
 			await scanRunner.cancel();
-			scanRunner.reset();
+			await scanRunner.reset();
 			return;
 		}
 		clearInterval(scanInterval!);

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { ScanRunner } from '../scan-runner.svelte.js';
@@ -35,8 +35,8 @@ describe('ScanRunner', () => {
 		runner = new ScanRunner();
 	});
 
-	afterEach(() => {
-		runner.reset();
+	afterEach(async () => {
+		await runner.reset();
 	});
 
 	it('starts in idle state', () => {
@@ -92,7 +92,7 @@ describe('ScanRunner', () => {
 	it('reset returns to idle', async () => {
 		vi.mocked(invoke).mockResolvedValue(undefined);
 		await runner.launch(mockConfig());
-		runner.reset();
+		await runner.reset();
 		expect(runner.state.status).toBe('idle');
 		expect(runner.state.devices).toEqual([]);
 	});

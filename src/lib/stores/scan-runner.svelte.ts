@@ -41,7 +41,10 @@ export class ScanRunner {
 	async launch(config: ScanConfig): Promise<void> {
 		if (this.state.status === 'running') return;
 
-		this.reset();
+		const cleanup = this.prepareReset();
+		if (cleanup) {
+			await cleanup();
+		}
 		this.state.status = 'running';
 		this.state.startedAt = Date.now();
 
@@ -102,8 +105,7 @@ export class ScanRunner {
 
 		try {
 			if (this.cleanup) {
-				await this.cleanup();
-				this.cleanup = null;
+				await this.takeCleanup()?.();
 			} else {
 				await cancelBackendScan();
 			}
@@ -114,11 +116,13 @@ export class ScanRunner {
 	}
 
 	/** Reset to idle state. */
-	reset(): void {
+	reset(): Promise<void> {
+		const cleanup = this.prepareReset();
+		return cleanup ? cleanup() : Promise.resolve();
+	}
+
+	private prepareReset(): (() => Promise<void>) | null {
 		this.stopElapsed();
-		if (this.cleanup) {
-			this.cleanup = null;
-		}
 		this.state = {
 			status: 'idle',
 			scanned: 0,
@@ -129,6 +133,7 @@ export class ScanRunner {
 			error: null
 		};
 		this.summary = null;
+		return this.takeCleanup();
 	}
 
 	// ── Private helpers ─────────────────────────────────────────────────────
@@ -153,6 +158,12 @@ export class ScanRunner {
 			clearInterval(this.elapsedTimer);
 			this.elapsedTimer = null;
 		}
+	}
+
+	private takeCleanup(): (() => Promise<void>) | null {
+		const cleanup = this.cleanup;
+		this.cleanup = null;
+		return cleanup;
 	}
 }
 
