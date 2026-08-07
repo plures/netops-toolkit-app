@@ -35,6 +35,10 @@ describe('ScanRunner', () => {
 		runner = new ScanRunner();
 	});
 
+	afterEach(() => {
+		runner.reset();
+	});
+
 	it('starts in idle state', () => {
 		expect(runner.state.status).toBe('idle');
 		expect(runner.state.devices).toEqual([]);
