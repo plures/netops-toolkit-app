@@ -1,3 +1,7 @@
+## [0.23.2] — 2026-08-07
+
+- Initial plan (#59) (df292ed)
+
 ## [0.23.1] — 2026-08-07
 
 - chore: delegate dependabot-auto-merge.yml to org reusable template (#58) (8677f25)
