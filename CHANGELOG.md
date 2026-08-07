@@ -1,3 +1,7 @@
+## [0.25.0] — 2026-08-07
+
+- feat(scan): add end-to-end scan runner (launch → progress → results ingestion) (#62) (e8b550c)
+
 ## [0.24.0] — 2026-08-07
 
 - feat(device): add LLDP/CDP neighbors tab to device detail view (#61) (e6fca88)
