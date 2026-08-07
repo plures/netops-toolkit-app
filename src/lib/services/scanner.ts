@@ -101,7 +101,14 @@ async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> 
 		const cb = callbacks.onDevice;
 		fns.push(
 			await listen<DeviceEvent>('scan:device', ({ payload }) =>
-				cb(deviceEventToDevice(payload))
+				cb({
+					hostname: payload.hostname,
+					ip: payload.ip,
+					vendor: payload.vendor,
+					version: payload.version,
+					model: payload.model,
+					serialNumber: payload.serialNumber
+				})
 			)
 		);
 	}
@@ -119,7 +126,7 @@ async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> 
 		const cb = callbacks.onComplete;
 		fns.push(
 			await listen<CompleteEvent>('scan:complete', ({ payload }) =>
-				cb(payload.total_devices, payload.duration_ms)
+				cb(payload.totalDevices, payload.durationMs)
 			)
 		);
 	}
@@ -135,18 +142,6 @@ async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> 
 
 	return fns;
 }
-
 function unlistenAll(unlisteners: UnlistenFn[]): void {
 	unlisteners.forEach((fn) => fn());
-}
-
-function deviceEventToDevice(e: DeviceEvent): Device {
-	return {
-		hostname: e.hostname,
-		ip: e.ip,
-		vendor: e.vendor,
-		version: e.version,
-		model: e.model,
-		serialNumber: e.serial_number
-	};
 }

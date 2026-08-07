@@ -54,6 +54,7 @@ pub struct ScanCancelState(pub Arc<Mutex<Option<oneshot::Sender<()>>>>);
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DeviceEvent {
     pub hostname: String,
     pub ip: String,
@@ -64,18 +65,21 @@ pub struct DeviceEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ProgressEvent {
     pub scanned: u32,
     pub total: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CompleteEvent {
     pub total_devices: u32,
     pub duration_ms: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ScanErrorEvent {
     pub message: String,
     pub ip: Option<String>,
