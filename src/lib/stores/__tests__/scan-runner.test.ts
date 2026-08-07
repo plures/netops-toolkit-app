@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { ScanRunner } from '../scan-runner.svelte.js';
 import type { ScanConfig } from '$lib/types.js';
 
@@ -95,6 +95,23 @@ describe('ScanRunner', () => {
 		await runner.reset();
 		expect(runner.state.status).toBe('idle');
 		expect(runner.state.devices).toEqual([]);
+	});
+
+	it('reset cleans up active scan listeners', async () => {
+		const unlisteners = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
+		let nextUnlistener = 0;
+		vi.mocked(listen).mockImplementation(() =>
+			Promise.resolve(unlisteners[nextUnlistener++] as UnlistenFn)
+		);
+		vi.mocked(invoke).mockResolvedValue(undefined);
+
+		await runner.launch(mockConfig());
+		vi.mocked(invoke).mockClear();
+
+		await runner.reset();
+
+		expect(invoke).toHaveBeenCalledWith('cancel_scan');
+		unlisteners.forEach((unlisten) => expect(unlisten).toHaveBeenCalledOnce());
 	});
 
 	it('does not re-launch when already running', async () => {

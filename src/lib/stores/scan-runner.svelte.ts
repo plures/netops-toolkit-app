@@ -93,9 +93,9 @@ export class ScanRunner {
 				);
 			}
 		} catch (err: unknown) {
+			this.stopElapsed();
 			this.state.status = 'error';
 			this.state.error = err instanceof Error ? err.message : String(err);
-			this.stopElapsed();
 		}
 	}
 
