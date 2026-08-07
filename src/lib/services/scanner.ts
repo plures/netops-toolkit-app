@@ -36,14 +36,7 @@ export async function scanSubnet(
 	concurrency: number,
 	callbacks: ScanCallbacks
 ): Promise<() => Promise<void>> {
-	const unlisteners = await attachListeners(callbacks);
-
-	await invoke('scan_subnet', { subnet, user, password, deep, concurrency });
-
-	return async () => {
-		await cancelScan();
-		unlisteners.forEach((fn) => fn());
-	};
+	return startScan('scan_subnet', { subnet, user, password, deep, concurrency }, callbacks);
 }
 
 /**
@@ -58,14 +51,7 @@ export async function scanCsv(
 	concurrency: number,
 	callbacks: ScanCallbacks
 ): Promise<() => Promise<void>> {
-	const unlisteners = await attachListeners(callbacks);
-
-	await invoke('scan_csv', { csvPath, user, password, deep, concurrency });
-
-	return async () => {
-		await cancelScan();
-		unlisteners.forEach((fn) => fn());
-	};
+	return startScan('scan_csv', { csvPath, user, password, deep, concurrency }, callbacks);
 }
 
 /** Send a cancellation signal to the running scan. */
@@ -84,6 +70,29 @@ export async function loadInventory(path: string): Promise<Device[]> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+async function startScan(
+	command: 'scan_subnet' | 'scan_csv',
+	args: Record<string, unknown>,
+	callbacks: ScanCallbacks
+): Promise<() => Promise<void>> {
+	const unlisteners = await attachListeners(callbacks);
+
+	try {
+		await invoke(command, args);
+	} catch (err) {
+		unlistenAll(unlisteners);
+		throw err;
+	}
+
+	return async () => {
+		try {
+			await cancelScan();
+		} finally {
+			unlistenAll(unlisteners);
+		}
+	};
+}
 
 async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> {
 	const fns: UnlistenFn[] = [];
@@ -125,6 +134,10 @@ async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> 
 	}
 
 	return fns;
+}
+
+function unlistenAll(unlisteners: UnlistenFn[]): void {
+	unlisteners.forEach((fn) => fn());
 }
 
 function deviceEventToDevice(e: DeviceEvent): Device {
