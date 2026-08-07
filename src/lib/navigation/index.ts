@@ -106,7 +106,9 @@ export function getBreadcrumbs(pathname: string): Array<{ label: string; href: s
 	// Add child segments beyond the first
 	if (segments.length > 1) {
 		const childPath = '/' + segments.join('/');
-		const childLabel = decodeURIComponent(segments[segments.length - 1]);
+		const rawLabel = segments[segments.length - 1];
+		let childLabel = rawLabel;
+		try { childLabel = decodeURIComponent(rawLabel); } catch { /* ignore malformed encoding */ }
 		crumbs.push({ label: childLabel, href: childPath });
 	}
 
