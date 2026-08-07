@@ -1,3 +1,7 @@
+## [0.23.1] — 2026-08-07
+
+- chore: delegate dependabot-auto-merge.yml to org reusable template (#58) (8677f25)
+
 ## [0.23.0] — 2026-07-24
 
 - ci(release): trigger release pipeline on merge to main (#57) (6c8da48)
