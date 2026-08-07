@@ -1,3 +1,7 @@
+## [0.26.0] — 2026-08-07
+
+- feat(config): config history + diff + rollback flows backed by PluresDB (#65) (010d0b4)
+
 ## [0.25.0] — 2026-08-07
 
 - feat(scan): add end-to-end scan runner (launch → progress → results ingestion) (#62) (e8b550c)
