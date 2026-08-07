@@ -34,11 +34,21 @@ export interface BgpPeer {
 	prefixesReceived: number;
 }
 
+/** LLDP/CDP discovered neighbor entry. */
+export interface NeighborEntry {
+	localInterface: string;
+	neighborDevice: string;
+	neighborPort: string;
+	platform: string;
+	capability: string;
+}
+
 /** Full device detail payload returned by the Tauri command. */
 export interface DeviceDetail {
 	systemInfo: SystemInfo;
 	interfaces: InterfaceEntry[];
 	health: HealthInfo;
 	bgpPeers: BgpPeer[];
+	neighbors: NeighborEntry[];
 	configOutput: string;
 }

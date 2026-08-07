@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DeviceDetail, HealthInfo } from '$lib/types/device-detail.types.js';
+import type { DeviceDetail, HealthInfo, NeighborEntry } from '$lib/types/device-detail.types.js';
 
 /**
  * Fetch full device detail (system info, interfaces, BGP, config).
@@ -15,4 +15,12 @@ export async function getDeviceDetail(hostname: string): Promise<DeviceDetail> {
  */
 export async function getDeviceHealth(hostname: string): Promise<HealthInfo> {
 	return invoke<HealthInfo>('get_device_health', { hostname });
+}
+
+/**
+ * Fetch LLDP/CDP neighbors for a device.
+ * Calls the `get_device_neighbors` Tauri command.
+ */
+export async function getDeviceNeighbors(hostname: string): Promise<NeighborEntry[]> {
+	return invoke<NeighborEntry[]>('get_device_neighbors', { hostname });
 }

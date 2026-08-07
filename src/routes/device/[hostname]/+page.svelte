@@ -11,12 +11,13 @@
 		Button,
 		useTui
 	} from '@plures/design-dojo';
-	import { getDeviceDetail, getDeviceHealth } from '$lib/services/device.js';
+	import { getDeviceDetail, getDeviceHealth, getDeviceNeighbors } from '$lib/services/device.js';
 	import type {
 		DeviceDetail,
 		HealthInfo,
 		InterfaceEntry,
-		BgpPeer
+		BgpPeer,
+		NeighborEntry
 	} from '$lib/types/device-detail.types.js';
 
 	interface Props {
@@ -30,11 +31,12 @@
 	// ---------------------------------------------------------------------------
 	// State
 	// ---------------------------------------------------------------------------
-	type Tab = 'interfaces' | 'health' | 'bgp' | 'config';
+	type Tab = 'interfaces' | 'health' | 'neighbors' | 'bgp' | 'config';
 	let activeTab = $state<Tab>('interfaces');
 
 	let detail = $state<DeviceDetail | null>(null);
 	let health = $state<HealthInfo | null>(null);
+	let neighbors = $state<NeighborEntry[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
@@ -47,11 +49,13 @@
 		error = null;
 		Promise.all([
 			getDeviceDetail(data.hostname),
-			getDeviceHealth(data.hostname)
+			getDeviceHealth(data.hostname),
+			getDeviceNeighbors(data.hostname)
 		])
-			.then(([d, h]) => {
+			.then(([d, h, n]) => {
 				detail = d;
 				health = h;
+				neighbors = n;
 				loading = false;
 			})
 			.catch((e: unknown) => {
@@ -113,9 +117,28 @@
 	const tabs: { id: Tab; label: string; tuiLabel: string }[] = [
 		{ id: 'interfaces', label: 'Interfaces', tuiLabel: '[IFaces]' },
 		{ id: 'health', label: 'Health', tuiLabel: '[Health]' },
+		{ id: 'neighbors', label: 'Neighbors', tuiLabel: '[Neighbors]' },
 		{ id: 'bgp', label: 'BGP', tuiLabel: '[BGP]' },
 		{ id: 'config', label: 'Config', tuiLabel: '[Config]' }
 	];
+
+	let neighborColumns = [
+		{ key: 'localInterface', label: 'Local Interface', width: 20 },
+		{ key: 'neighborDevice', label: 'Neighbor Device', width: 24 },
+		{ key: 'neighborPort', label: 'Neighbor Port', width: 20 },
+		{ key: 'platform', label: 'Platform', width: 16 },
+		{ key: 'capability', label: 'Capability', width: 14 }
+	];
+
+	let neighborRows = $derived(
+		neighbors.map((n: NeighborEntry) => ({
+			localInterface: n.localInterface,
+			neighborDevice: n.neighborDevice,
+			neighborPort: n.neighborPort,
+			platform: n.platform,
+			capability: n.capability
+		}))
+	);
 
 	function bgpStateBadgeVariant(
 		state: string
@@ -273,6 +296,41 @@
 										</div>
 										<div class="gauge-value">{health.temperatureCelsius.toFixed(0)}°C</div>
 									</div>
+								{/if}
+							</div>
+						{/if}
+					{:else if activeTab === 'neighbors'}
+						{#if isTui}
+							<div class="tui-table">
+								<div class="tui-header">
+									<span style="min-width:20ch">Local Iface</span>
+									<span style="min-width:24ch">Neighbor</span>
+									<span style="min-width:20ch">Remote Port</span>
+									<span style="min-width:16ch">Platform</span>
+									<span style="min-width:14ch">Capability</span>
+								</div>
+								{#each neighbors as n}
+									<div class="tui-row">
+										<span style="min-width:20ch">{n.localInterface}</span>
+										<span style="min-width:24ch">{n.neighborDevice}</span>
+										<span style="min-width:20ch">{n.neighborPort}</span>
+										<span style="min-width:16ch">{n.platform}</span>
+										<span style="min-width:14ch">{n.capability}</span>
+									</div>
+								{/each}
+								{#if neighbors.length === 0}
+									<div class="tui-row"><span>No neighbors discovered</span></div>
+								{/if}
+							</div>
+						{:else}
+							<div class="neighbor-table-wrap">
+								<Table
+									tui={false}
+									columns={neighborColumns}
+									rows={neighborRows}
+								/>
+								{#if neighbors.length === 0}
+									<p class="empty-msg">No LLDP/CDP neighbors discovered.</p>
 								{/if}
 							</div>
 						{/if}
@@ -523,8 +581,15 @@
 
 	/* Interface table */
 	.iface-table-wrap,
-	.bgp-table-wrap {
+	.bgp-table-wrap,
+	.neighbor-table-wrap {
 		overflow: auto;
+	}
+
+	.empty-msg {
+		color: var(--color-text-muted, #888);
+		font-size: 0.875rem;
+		padding: 12px 0;
 	}
 
 	.bgp-badges {

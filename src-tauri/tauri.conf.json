@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "netops-toolkit",
-  "version": "0.23.2",
+  "version": "0.25.0",
   "identifier": "app.plures.netops-toolkit",
   "build": {
     "frontendDist": "../build",
