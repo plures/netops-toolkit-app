@@ -1,3 +1,8 @@
+## [0.24.0] — 2026-08-07
+
+- feat(device): add LLDP/CDP neighbors tab to device detail view (#61) (e6fca88)
+- Fix npm release failure by removing private publish guard (#60) (58bed36)
+
 ## [0.23.2] — 2026-08-07
 
 - Initial plan (#59) (df292ed)

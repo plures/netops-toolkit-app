@@ -1,6 +1,6 @@
 {
   "name": "netops-toolkit-app",
-  "version": "0.23.2",
+  "version": "0.24.0",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
