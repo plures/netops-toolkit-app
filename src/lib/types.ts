@@ -49,7 +49,7 @@ export interface DeviceEvent {
 	vendor: string;
 	version: string;
 	model?: string;
-	serial_number?: string;
+	serialNumber?: string;
 }
 
 /** Periodic progress update from the scanner. */
@@ -60,8 +60,8 @@ export interface ProgressEvent {
 
 /** Emitted when a scan finishes successfully. */
 export interface CompleteEvent {
-	total_devices: number;
-	duration_ms: number;
+	totalDevices: number;
+	durationMs: number;
 }
 
 /** Emitted on a non-fatal scan error (e.g. single host timeout). */

@@ -36,14 +36,7 @@ export async function scanSubnet(
 	concurrency: number,
 	callbacks: ScanCallbacks
 ): Promise<() => Promise<void>> {
-	const unlisteners = await attachListeners(callbacks);
-
-	await invoke('scan_subnet', { subnet, user, password, deep, concurrency });
-
-	return async () => {
-		await cancelScan();
-		unlisteners.forEach((fn) => fn());
-	};
+	return startScan('scan_subnet', { subnet, user, password, deep, concurrency }, callbacks);
 }
 
 /**
@@ -58,14 +51,7 @@ export async function scanCsv(
 	concurrency: number,
 	callbacks: ScanCallbacks
 ): Promise<() => Promise<void>> {
-	const unlisteners = await attachListeners(callbacks);
-
-	await invoke('scan_csv', { csvPath, user, password, deep, concurrency });
-
-	return async () => {
-		await cancelScan();
-		unlisteners.forEach((fn) => fn());
-	};
+	return startScan('scan_csv', { csvPath, user, password, deep, concurrency }, callbacks);
 }
 
 /** Send a cancellation signal to the running scan. */
@@ -85,6 +71,29 @@ export async function loadInventory(path: string): Promise<Device[]> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+async function startScan(
+	command: 'scan_subnet' | 'scan_csv',
+	args: Record<string, unknown>,
+	callbacks: ScanCallbacks
+): Promise<() => Promise<void>> {
+	const unlisteners = await attachListeners(callbacks);
+
+	try {
+		await invoke(command, args);
+	} catch (err) {
+		unlistenAll(unlisteners);
+		throw err;
+	}
+
+	return async () => {
+		try {
+			await cancelScan();
+		} finally {
+			unlistenAll(unlisteners);
+		}
+	};
+}
+
 async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> {
 	const fns: UnlistenFn[] = [];
 
@@ -92,7 +101,14 @@ async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> 
 		const cb = callbacks.onDevice;
 		fns.push(
 			await listen<DeviceEvent>('scan:device', ({ payload }) =>
-				cb(deviceEventToDevice(payload))
+				cb({
+					hostname: payload.hostname,
+					ip: payload.ip,
+					vendor: payload.vendor,
+					version: payload.version,
+					model: payload.model,
+					serialNumber: payload.serialNumber
+				})
 			)
 		);
 	}
@@ -110,7 +126,7 @@ async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> 
 		const cb = callbacks.onComplete;
 		fns.push(
 			await listen<CompleteEvent>('scan:complete', ({ payload }) =>
-				cb(payload.total_devices, payload.duration_ms)
+				cb(payload.totalDevices, payload.durationMs)
 			)
 		);
 	}
@@ -126,14 +142,6 @@ async function attachListeners(callbacks: ScanCallbacks): Promise<UnlistenFn[]> 
 
 	return fns;
 }
-
-function deviceEventToDevice(e: DeviceEvent): Device {
-	return {
-		hostname: e.hostname,
-		ip: e.ip,
-		vendor: e.vendor,
-		version: e.version,
-		model: e.model,
-		serialNumber: e.serial_number
-	};
+function unlistenAll(unlisteners: UnlistenFn[]): void {
+	unlisteners.forEach((fn) => fn());
 }

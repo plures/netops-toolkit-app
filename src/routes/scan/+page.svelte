@@ -1,6 +1,15 @@
 <script lang="ts">
 	import ProgressBar from '$lib/components/ProgressBar.svelte';
 	import type { Device, ScanConfig, ScanState } from '$lib/types.js';
+	import { scanRunner } from '$lib/stores/scan-runner.svelte.js';
+
+	/**
+	 * When running inside Tauri, delegate to the real scan runner which
+	 * communicates with the Rust backend. In browser-only dev mode, fall
+	 * back to the inline mock so the UI remains exercisable without the
+	 * backend.
+	 */
+	const useTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 	// ---------------------------------------------------------------------------
 	// Form state
@@ -15,9 +24,10 @@
 	});
 
 	// ---------------------------------------------------------------------------
-	// Scan state
+	// Scan state — when using Tauri, `scan` is a derived alias for the runner's state.
+	// In mock mode it's managed locally as before.
 	// ---------------------------------------------------------------------------
-	let scan: ScanState = $state({
+	let mockScan: ScanState = $state({
 		status: 'idle',
 		scanned: 0,
 		total: 0,
@@ -26,6 +36,8 @@
 		elapsedMs: 0,
 		error: null
 	});
+
+	let scan: ScanState = $derived(useTauri ? scanRunner.state : mockScan);
 
 	/** Regex pattern for CIDR notation — kept as a variable to avoid Svelte template conflicts. */
 	const subnetPattern = String.raw`^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$`;
@@ -81,7 +93,15 @@
 	// Scan lifecycle
 	// ---------------------------------------------------------------------------
 	function startScan() {
-		if (scan.status === 'running') return;
+		if (useTauri) {
+			scanRunner.launch(config);
+			return;
+		}
+		startMockScan();
+	}
+
+	function startMockScan() {
+		if (mockScan.status === 'running') return;
 
 		// Derive total host count from subnet (simplified: /24 → 254 hosts etc.)
 		const rawPrefix = (config.subnet || '').split('/')[1] ?? '';
@@ -98,13 +118,13 @@
 
 		// Handle /31 and /32 explicitly: this mock scanner does not support them
 		if (prefix >= 31) {
-			scan.status = 'error';
-			scan.error = 'Subnets with /31 or /32 prefixes are not supported in this scanner.';
-			scan.scanned = 0;
-			scan.total = 0;
-			scan.devices = [];
-			scan.startedAt = null;
-			scan.elapsedMs = 0;
+			mockScan.status = 'error';
+			mockScan.error = 'Subnets with /31 or /32 prefixes are not supported in this scanner.';
+			mockScan.scanned = 0;
+			mockScan.total = 0;
+			mockScan.devices = [];
+			mockScan.startedAt = null;
+			mockScan.elapsedMs = 0;
 			return;
 		}
 
@@ -112,7 +132,7 @@
 		const total = Math.min(totalHosts, 254);
 		const allDevices = generateMockDevices(Math.max(1, Math.floor(total * 0.35)));
 
-		scan = {
+		mockScan = {
 			status: 'running',
 			scanned: 0,
 			total,
@@ -124,8 +144,8 @@
 
 		// Elapsed timer
 		elapsedInterval = setInterval(() => {
-			if (scan.startedAt !== null) {
-				scan.elapsedMs = Date.now() - scan.startedAt;
+			if (mockScan.startedAt !== null) {
+				mockScan.elapsedMs = Date.now() - mockScan.startedAt;
 			}
 		}, 500);
 
@@ -134,7 +154,7 @@
 		let deviceIdx = 0;
 
 		scanInterval = setInterval(() => {
-			const next = Math.min(scan.scanned + step, scan.total);
+			const next = Math.min(mockScan.scanned + step, mockScan.total);
 			const newDevices: Device[] = [];
 
 			while (deviceIdx < allDevices.length && allDevices[deviceIdx].ip <= ipFromIdx(next)) {
@@ -142,13 +162,13 @@
 				deviceIdx++;
 			}
 
-			scan.scanned = next;
+			mockScan.scanned = next;
 			if (newDevices.length) {
-				scan.devices = [...scan.devices, ...newDevices];
+				mockScan.devices = [...mockScan.devices, ...newDevices];
 			}
 
-			if (next >= scan.total) {
-				finishScan();
+			if (next >= mockScan.total) {
+				finishMockScan();
 			}
 		}, 300);
 	}
@@ -159,23 +179,28 @@
 		return `${parts[0]}.${parts[1]}.${parts[2]}.${idx}`;
 	}
 
-	function finishScan() {
+	function finishMockScan() {
 		clearInterval(scanInterval!);
 		clearInterval(elapsedInterval!);
 		scanInterval = null;
 		elapsedInterval = null;
-		if (scan.startedAt !== null) {
-			scan.elapsedMs = Date.now() - scan.startedAt;
+		if (mockScan.startedAt !== null) {
+			mockScan.elapsedMs = Date.now() - mockScan.startedAt;
 		}
-		scan.status = 'complete';
+		mockScan.status = 'complete';
 	}
 
-	function resetScan() {
+	async function resetScan() {
+		if (useTauri) {
+			await scanRunner.cancel();
+			scanRunner.reset();
+			return;
+		}
 		clearInterval(scanInterval!);
 		clearInterval(elapsedInterval!);
 		scanInterval = null;
 		elapsedInterval = null;
-		scan = {
+		mockScan = {
 			status: 'idle',
 			scanned: 0,
 			total: 0,
