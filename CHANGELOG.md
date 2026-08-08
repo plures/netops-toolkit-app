@@ -1,3 +1,7 @@
+## [0.28.0] — 2026-08-08
+
+- feat: harden routing/navigation and add shared ViewShell for GUI/TUI parity (#64) (c991a60)
+
 ## [0.27.0] — 2026-08-07
 
 - feat: normalize data contracts between UI and netops-toolkit sidecar (#63) (5c2185b)
