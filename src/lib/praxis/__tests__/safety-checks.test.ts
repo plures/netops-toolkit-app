@@ -7,7 +7,6 @@ import {
 	maintenanceWindowCheck,
 	blastRadiusCheck,
 	planIdRequired,
-	DEFAULT_SAFETY_RULES,
 } from '../safety-checks.js';
 import type { SafetyCheckContext } from '../safety-checks.types.js';
 
