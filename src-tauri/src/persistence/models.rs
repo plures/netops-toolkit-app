@@ -18,13 +18,3 @@ pub struct ScanRecord {
     pub status: String,
     pub error: Option<String>,
 }
-
-/// Query parameters for listing scan history.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScanHistoryQuery {
-    pub target: Option<String>,
-    pub mode: Option<String>,
-    pub limit: Option<usize>,
-    pub since: Option<String>,
-}
