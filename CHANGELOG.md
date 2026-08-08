@@ -1,3 +1,7 @@
+## [0.29.0] — 2026-08-08
+
+- feat: add minimal local persistence (PluresDB) for scan history (#67) (3f18b9f)
+
 ## [0.28.0] — 2026-08-08
 
 - feat: harden routing/navigation and add shared ViewShell for GUI/TUI parity (#64) (c991a60)
