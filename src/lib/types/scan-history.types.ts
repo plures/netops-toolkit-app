@@ -1,8 +1,8 @@
 /**
- * Types for PluresDB-backed scan history persistence.
+ * Types for scan history persistence.
  *
- * These types represent the graph nodes stored in PluresDB for tracking
- * network scan results over time.
+ * Note: the backend implementation is currently a Phase 0 in-memory placeholder
+ * (not yet persisted to PluresDB / disk).
  */
 
 /** A scan result record stored in PluresDB. */
