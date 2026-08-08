@@ -20,6 +20,14 @@ pub async fn pluresdb_scan_save(
     status: String,
     error: Option<String>,
 ) -> Result<ScanRecord, String> {
+    if !matches!(mode.as_str(), "subnet" | "csv") {
+        return Err(format!("Invalid scan mode: {mode}"));
+    }
+    if !matches!(status.as_str(), "complete" | "error" | "cancelled") {
+        return Err(format!("Invalid scan status: {status}"));
+    }
+    let error = if status == "error" { error } else { None };
+
     let record = ScanRecord {
         id: uuid::Uuid::new_v4().to_string(),
         target,
