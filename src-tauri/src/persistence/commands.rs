@@ -44,6 +44,11 @@ pub async fn pluresdb_scan_save(
     let mut store = state.0.lock().await;
     store.scan_records.push(record.clone());
 
+    const MAX_SCAN_RECORDS: usize = 1000;
+    if store.scan_records.len() > MAX_SCAN_RECORDS {
+        let excess = store.scan_records.len() - MAX_SCAN_RECORDS;
+        store.scan_records.drain(0..excess);
+    }
     Ok(record)
 }
 
