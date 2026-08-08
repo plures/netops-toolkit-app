@@ -5,12 +5,14 @@ use tokio::sync::Mutex;
 mod commands;
 mod licensing;
 mod partitions;
+mod persistence;
 mod policy;
 
 use commands::ScanCancelState;
 use licensing::commands::LicenseState;
 use licensing::models::License;
 use partitions::commands::PartitionListState;
+use persistence::store::{PluresDbState, PluresDbStore};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,6 +22,7 @@ pub fn run() {
         .manage(ScanCancelState(Arc::new(Mutex::new(None))))
         .manage(LicenseState(Arc::new(Mutex::new(License::free()))))
         .manage(PartitionListState(Arc::new(Mutex::new(Vec::new()))))
+        .manage(PluresDbState(Arc::new(Mutex::new(PluresDbStore::default()))))
         .invoke_handler(tauri::generate_handler![
             commands::scan_subnet,
             commands::scan_csv,
@@ -58,6 +61,11 @@ pub fn run() {
             partitions::commands::list_partitions,
             partitions::commands::create_partition,
             partitions::commands::update_partition_state,
+            // PluresDB persistence commands
+            persistence::commands::pluresdb_scan_save,
+            persistence::commands::pluresdb_scan_list,
+            persistence::commands::pluresdb_scan_get,
+            persistence::commands::pluresdb_scan_delete,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)]
