@@ -1,8 +1,9 @@
 /**
- * PluresDB-backed scan history repository.
+ * Local scan history repository (Phase 0 placeholder).
  *
- * Provides scan result persistence and query operations using PluresDB
- * graph storage via Tauri invoke commands.
+ * Provides scan result persistence and query operations via Tauri invoke
+ * commands. Backend storage is currently in-memory and will be replaced by a
+ * PluresDB-backed graph store.
  *
  * PluresDB commands (registered in src-tauri):
  *   pluresdb_scan_save   → persist a completed scan record
