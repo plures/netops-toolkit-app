@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Button, Badge, Table, StatusBar, StatusBarItem, StatusBarSpacer } from '@plures/design-dojo';
 	import { useTui } from '@plures/design-dojo';
 	import { tunnelStore } from '$lib/stores/tunnels.svelte.js';
-	import { createDefaultProfile, type TunnelProfile, type TunnelType } from '$lib/types/tunnel.types.js';
+	import { createDefaultProfile, type TunnelProfile } from '$lib/types/tunnel.types.js';
 	import LicenseGate from '$lib/components/LicenseGate.svelte';
 
 	const getTui = useTui();
@@ -15,27 +16,21 @@
 
 	// Form state
 	let formName = $state('');
-	let formType = $state<TunnelType>('local-forward');
 	let formBastionHost = $state('');
 	let formBastionPort = $state(22);
 	let formBastionUsername = $state('');
-	let formTargetNetwork = $state('');
-	let formLocalPort = $state(10022);
-	let formRemoteHost = $state('');
-	let formRemotePort = $state(22);
-	let formAutoConnect = $state(false);
-	let formKeepAlive = $state(60);
-	let formAutoReconnect = $state(true);
+	let formBastionPassword = $state('');
 	let errorMsg = $state('');
+
+	onMount(() => {
+		void tunnelStore.refresh();
+	});
 
 	// ── Table data ──────────────────────────────────────────────────────────
 
 	const columns = [
 		{ key: 'name', label: 'Name', width: 18 },
-		{ key: 'type', label: 'Type', width: 14 },
 		{ key: 'bastion', label: 'Bastion', width: 28 },
-		{ key: 'target', label: 'Target', width: 16 },
-		{ key: 'localPort', label: 'Local Port', width: 10 },
 		{ key: 'status', label: 'Status', width: 12 },
 	];
 
@@ -44,10 +39,7 @@
 			const state = tunnelStore.getState(p.id);
 			return {
 				name: p.name,
-				type: p.type === 'local-forward' ? 'L-Forward' : 'SOCKS5',
 				bastion: `${p.bastionUsername}@${p.bastionHost}:${p.bastionPort}`,
-				target: p.targetNetwork ?? '(dynamic)',
-				localPort: String(p.localPort),
 				status: state?.status ?? 'unknown',
 			};
 		}),
@@ -61,17 +53,10 @@
 		editingId = null;
 		const defaults = createDefaultProfile();
 		formName = defaults.name;
-		formType = defaults.type;
 		formBastionHost = defaults.bastionHost;
 		formBastionPort = defaults.bastionPort;
 		formBastionUsername = defaults.bastionUsername;
-		formTargetNetwork = defaults.targetNetwork ?? '';
-		formLocalPort = defaults.localPort;
-		formRemoteHost = defaults.remoteHost ?? '';
-		formRemotePort = defaults.remotePort ?? 22;
-		formAutoConnect = defaults.autoConnect;
-		formKeepAlive = defaults.keepAliveInterval;
-		formAutoReconnect = defaults.autoReconnect;
+		formBastionPassword = '';
 		errorMsg = '';
 		view = 'form';
 	}
@@ -79,17 +64,10 @@
 	function openEditForm(profile: TunnelProfile): void {
 		editingId = profile.id;
 		formName = profile.name;
-		formType = profile.type;
 		formBastionHost = profile.bastionHost;
 		formBastionPort = profile.bastionPort;
 		formBastionUsername = profile.bastionUsername;
-		formTargetNetwork = profile.targetNetwork ?? '';
-		formLocalPort = profile.localPort;
-		formRemoteHost = profile.remoteHost ?? '';
-		formRemotePort = profile.remotePort ?? 22;
-		formAutoConnect = profile.autoConnect;
-		formKeepAlive = profile.keepAliveInterval;
-		formAutoReconnect = profile.autoReconnect;
+		formBastionPassword = '';
 		errorMsg = '';
 		view = 'form';
 	}
@@ -101,25 +79,27 @@
 
 		const data = {
 			name: formName.trim(),
-			type: formType,
+			type: 'dynamic-socks' as const,
 			bastionHost: formBastionHost.trim(),
 			bastionPort: formBastionPort,
 			vaultCredentialId: null,
 			bastionUsername: formBastionUsername.trim(),
-			targetNetwork: formTargetNetwork.trim() || null,
-			localPort: formLocalPort,
-			remoteHost: formRemoteHost.trim() || null,
-			remotePort: formRemotePort || null,
-			autoConnect: formAutoConnect,
-			keepAliveInterval: formKeepAlive,
-			autoReconnect: formAutoReconnect,
+			targetNetwork: null,
+			localPort: 0,
+			remoteHost: null,
+			remotePort: null,
+			autoConnect: false,
+			keepAliveInterval: 0,
+			autoReconnect: true,
 			maxReconnectAttempts: 5,
 		};
 
 		if (editingId) {
 			tunnelStore.updateProfile(editingId, data);
+			if (formBastionPassword) tunnelStore.setSessionPassword(editingId, formBastionPassword);
 		} else {
-			tunnelStore.addProfile(data);
+			const profile = tunnelStore.addProfile(data);
+			if (formBastionPassword) tunnelStore.setSessionPassword(profile.id, formBastionPassword);
 		}
 		view = 'list';
 	}
@@ -151,8 +131,8 @@
 	<div class="tunnels-page tui">
 		{#if view === 'list'}
 			<div class="header">
-				<span class="title">SSH TUNNELS</span>
-				<span class="info">{tunnelStore.connectedCount} connected / {tunnelStore.profiles.length} configured</span>
+				<span class="title">ACTIVE BASTION</span>
+				<span class="info">{tunnelStore.connectedCount} connected / {tunnelStore.profiles.length} saved</span>
 			</div>
 			<Table {columns} {rows} selected={selectedIndex} onselect={handleSelectRow} tui={true} />
 
@@ -191,16 +171,12 @@
 
 		{:else}
 			<div class="header">
-				<span class="title">{editingId ? 'EDIT TUNNEL' : 'ADD TUNNEL'}</span>
+				<span class="title">{editingId ? 'EDIT BASTION' : 'ADD BASTION'}</span>
 			</div>
 			<div class="tui-form">
 				<div class="form-row">
 					<label for="t-name">Name: </label>
 					<input id="t-name" type="text" bind:value={formName} class="tui-input" aria-label="Tunnel name" />
-				</div>
-				<div class="form-row">
-					<label for="t-type">Type [local-forward/dynamic-socks]: </label>
-					<input id="t-type" type="text" bind:value={formType} class="tui-input" aria-label="Tunnel type" />
 				</div>
 				<div class="form-row">
 					<label for="t-bastion">Bastion: </label>
@@ -209,14 +185,8 @@
 				<div class="form-row">
 					<label for="t-user">Username: </label>
 					<input id="t-user" type="text" bind:value={formBastionUsername} class="tui-input" aria-label="Username" />
-				</div>
-				<div class="form-row">
-					<label for="t-target">Target Network: </label>
-					<input id="t-target" type="text" bind:value={formTargetNetwork} class="tui-input" placeholder="10.0.0.0/16" aria-label="Target network" />
-				</div>
-				<div class="form-row">
-					<label for="t-local">Local Port: </label>
-					<input id="t-local" type="number" bind:value={formLocalPort} class="tui-input short" aria-label="Local port" />
+					<label for="t-password">Password: </label>
+					<input id="t-password" type="password" bind:value={formBastionPassword} class="tui-input" aria-label="Bastion password" />
 				</div>
 				{#if errorMsg}<div class="tui-error">{errorMsg}</div>{/if}
 				<div class="tui-actions">
@@ -230,32 +200,25 @@
 {:else}
 	<div class="tunnels-page gui">
 		<div class="toolbar">
-			<h2>SSH Tunnels</h2>
+			<h2>Active Bastion</h2>
 			<div class="toolbar-info">
 				<Badge variant={tunnelStore.connectedCount > 0 ? 'success' : 'neutral'} size="sm">
 					{tunnelStore.connectedCount} connected
 				</Badge>
 			</div>
 			<div class="toolbar-actions">
-				<Button variant="solid" onclick={openAddForm}>＋ Add Tunnel</Button>
+				<Button variant="solid" onclick={openAddForm}>＋ Add Bastion</Button>
 			</div>
 		</div>
 
 		{#if view === 'form'}
 			<div class="form-card">
-				<h3>{editingId ? 'Edit Tunnel' : 'New Tunnel'}</h3>
+				<h3>{editingId ? 'Edit Bastion' : 'New Bastion'}</h3>
 
 				<div class="form-grid">
 					<div class="field">
 						<label for="gui-t-name">Name</label>
 						<input id="gui-t-name" type="text" bind:value={formName} placeholder="NYC-DC1 Bastion" class="text-input" />
-					</div>
-					<div class="field">
-						<label for="gui-t-type">Type</label>
-						<select id="gui-t-type" bind:value={formType} class="select-input">
-							<option value="local-forward">Local Forward (-L)</option>
-							<option value="dynamic-socks">SOCKS Proxy (-D)</option>
-						</select>
 					</div>
 					<div class="field">
 						<label for="gui-t-bastion">Bastion Host</label>
@@ -270,36 +233,8 @@
 						<input id="gui-t-user" type="text" bind:value={formBastionUsername} placeholder="admin" class="text-input" />
 					</div>
 					<div class="field">
-						<label for="gui-t-local">Local Port</label>
-						<input id="gui-t-local" type="number" bind:value={formLocalPort} class="text-input number" min="1024" max="65535" />
-					</div>
-					{#if formType === 'local-forward'}
-						<div class="field span-2">
-							<label for="gui-t-target">Target Network / CIDR</label>
-							<input id="gui-t-target" type="text" bind:value={formTargetNetwork} placeholder="10.0.0.0/16" class="text-input" />
-						</div>
-						<div class="field">
-							<label for="gui-t-rhost">Remote Host (optional)</label>
-							<input id="gui-t-rhost" type="text" bind:value={formRemoteHost} placeholder="10.0.0.1" class="text-input" />
-						</div>
-						<div class="field">
-							<label for="gui-t-rport">Remote Port</label>
-							<input id="gui-t-rport" type="number" bind:value={formRemotePort} class="text-input number" min="1" max="65535" />
-						</div>
-					{/if}
-					<div class="field checkbox-field">
-						<label>
-							<input type="checkbox" bind:checked={formAutoConnect} /> Auto-connect on start
-						</label>
-					</div>
-					<div class="field checkbox-field">
-						<label>
-							<input type="checkbox" bind:checked={formAutoReconnect} /> Auto-reconnect
-						</label>
-					</div>
-					<div class="field">
-						<label for="gui-t-keepalive">Keep Alive (seconds)</label>
-						<input id="gui-t-keepalive" type="number" bind:value={formKeepAlive} class="text-input number" min="0" max="600" />
+						<label for="gui-t-password">Password</label>
+						<input id="gui-t-password" type="password" bind:value={formBastionPassword} placeholder="Stored only for this app session" class="text-input" />
 					</div>
 				</div>
 
@@ -318,11 +253,6 @@
 						<div class="tunnel-header">
 							<div class="tunnel-info">
 								<h3>{profile.name}</h3>
-								<span class="tunnel-type">
-									<Badge variant="neutral" size="sm">
-										{profile.type === 'local-forward' ? 'Local Forward' : 'SOCKS5 Proxy'}
-									</Badge>
-								</span>
 							</div>
 							<Badge variant={statusVariant(state?.status ?? 'disconnected')} size="sm">
 								{state?.status ?? 'unknown'}
@@ -333,16 +263,6 @@
 						<dl class="tunnel-detail">
 							<dt>Bastion</dt>
 							<dd class="mono">{profile.bastionUsername}@{profile.bastionHost}:{profile.bastionPort}</dd>
-							{#if profile.targetNetwork}
-								<dt>Target</dt>
-								<dd class="mono">{profile.targetNetwork}</dd>
-							{/if}
-							<dt>Local Port</dt>
-							<dd class="mono">localhost:{profile.localPort}</dd>
-							{#if profile.remoteHost}
-								<dt>Remote</dt>
-								<dd class="mono">{profile.remoteHost}:{profile.remotePort}</dd>
-							{/if}
 						</dl>
 
 						<div class="tunnel-actions">
@@ -387,7 +307,6 @@
 	.tui-form { padding: 0.5ch 0; display: flex; flex-direction: column; gap: 0.5ch; }
 	.form-row { display: flex; align-items: center; gap: 1ch; }
 	.tui-input { background: transparent; border: 1px solid var(--tui-border, #444); color: inherit; font-family: monospace; padding: 0.25ch 0.5ch; width: 24ch; }
-	.tui-input.short { width: 8ch; }
 	.tui-error { color: var(--color-error, #f38ba8); }
 	.tui-tunnel-row { display: flex; gap: 2ch; align-items: center; padding: 0.25ch 0; }
 	.tui-name { color: var(--color-text, #e0e0e0); min-width: 16ch; }
@@ -418,12 +337,9 @@
 	.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 	.field { display: flex; flex-direction: column; gap: 0.25rem; }
 	.field label { font-size: 0.8125rem; font-weight: 500; color: var(--color-text-secondary, #a9b1d6); }
-	.span-2 { grid-column: span 2; }
-	.checkbox-field { flex-direction: row; align-items: center; gap: 0.5rem; }
-	.checkbox-field label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
-	.text-input, .select-input { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #3b4261); border-radius: 4px; background: var(--color-bg, #1a1b26); color: var(--color-text, #c0caf5); font-size: 0.875rem; width: 100%; box-sizing: border-box; }
+	.text-input { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border, #3b4261); border-radius: 4px; background: var(--color-bg, #1a1b26); color: var(--color-text, #c0caf5); font-size: 0.875rem; width: 100%; box-sizing: border-box; }
 	.text-input.number { max-width: 100px; }
-	.text-input:focus, .select-input:focus { outline: 2px solid var(--color-accent, #7aa2f7); outline-offset: 1px; }
+	.text-input:focus { outline: 2px solid var(--color-accent, #7aa2f7); outline-offset: 1px; }
 	.error-msg { color: var(--color-error, #f85149); font-size: 0.875rem; margin: 0.5rem 0; }
 	.form-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
 </style>

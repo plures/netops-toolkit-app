@@ -5,64 +5,16 @@ import type {
 	TunnelStatus,
 } from '$lib/types/tunnel.types.js';
 import { createDefaultProfile } from '$lib/types/tunnel.types.js';
+import { invoke } from '@tauri-apps/api/core';
+
+interface BastionStatus {
+	connected: boolean;
+	host: string | null;
+	port: number | null;
+	username: string | null;
+}
 
 const TUNNEL_STORAGE_KEY = 'netops-toolkit-tunnels';
-
-// ─── Mock tunnel states for development ─────────────────────────────────────
-
-const mockProfiles: TunnelProfile[] = [
-	{
-		id: 'tun-1',
-		name: 'NYC-DC1 Bastion',
-		type: 'local-forward',
-		bastionHost: 'bastion.nyc.corp.example.com',
-		bastionPort: 22,
-		vaultCredentialId: 'default-1',
-		bastionUsername: 'admin',
-		targetNetwork: '10.0.0.0/16',
-		localPort: 10022,
-		remoteHost: null,
-		remotePort: null,
-		autoConnect: false,
-		keepAliveInterval: 60,
-		autoReconnect: true,
-		maxReconnectAttempts: 5,
-	},
-	{
-		id: 'tun-2',
-		name: 'LON-DC2 SOCKS',
-		type: 'dynamic-socks',
-		bastionHost: 'jump.lon.corp.example.com',
-		bastionPort: 2222,
-		vaultCredentialId: null,
-		bastionUsername: 'netops',
-		targetNetwork: null,
-		localPort: 1080,
-		remoteHost: null,
-		remotePort: null,
-		autoConnect: false,
-		keepAliveInterval: 30,
-		autoReconnect: true,
-		maxReconnectAttempts: 10,
-	},
-	{
-		id: 'tun-3',
-		name: 'SYD-DC3 Direct',
-		type: 'local-forward',
-		bastionHost: '203.0.113.50',
-		bastionPort: 22,
-		vaultCredentialId: 'group-1',
-		bastionUsername: 'svcacct',
-		targetNetwork: '10.0.2.0/24',
-		localPort: 10023,
-		remoteHost: '10.0.2.1',
-		remotePort: 22,
-		autoConnect: true,
-		keepAliveInterval: 60,
-		autoReconnect: true,
-		maxReconnectAttempts: 3,
-	},
-];
 
 // ─── Tunnel Store (Svelte 5 runes) ─────────────────────────────────────────
 
@@ -70,6 +22,7 @@ class TunnelStore {
 	profiles = $state<TunnelProfile[]>([]);
 	states = $state<Map<string, TunnelState>>(new Map());
 	events = $state<TunnelEvent[]>([]);
+	private readonly sessionPasswords = new Map<string, string>();
 
 	constructor() {
 		this.load();
@@ -79,7 +32,7 @@ class TunnelStore {
 
 	private load(): void {
 		if (typeof localStorage === 'undefined') {
-			this.profiles = [...mockProfiles];
+			this.profiles = [];
 			this.initStates();
 			return;
 		}
@@ -88,10 +41,10 @@ class TunnelStore {
 			try {
 				this.profiles = JSON.parse(raw) as TunnelProfile[];
 			} catch {
-				this.profiles = [...mockProfiles];
+				this.profiles = [];
 			}
 		} else {
-			this.profiles = [...mockProfiles];
+			this.profiles = [];
 		}
 		this.initStates();
 	}
@@ -167,42 +120,89 @@ class TunnelStore {
 	deleteProfile(id: string): void {
 		this.profiles = this.profiles.filter((p) => p.id !== id);
 		this.states.delete(id);
+		this.sessionPasswords.delete(id);
 		this.save();
+	}
+
+	async refresh(): Promise<void> {
+		try {
+			const status = await invoke<BastionStatus>('bastion_status');
+			for (const profile of this.profiles) {
+				const state = this.states.get(profile.id);
+				if (!state) continue;
+				const matches = status.connected
+					&& profile.bastionHost === status.host
+					&& profile.bastionPort === status.port
+					&& profile.bastionUsername === status.username;
+				state.status = matches ? 'connected' : 'disconnected';
+				state.connectedAt = matches ? state.connectedAt ?? Date.now() : null;
+				state.lastError = null;
+			}
+			this.states = new Map(this.states);
+		} catch {
+			// The desktop sidecar is unavailable in browser-only development.
+		}
+	}
+
+	setSessionPassword(profileId: string, password: string): void {
+		if (password) this.sessionPasswords.set(profileId, password);
+		else this.sessionPasswords.delete(profileId);
 	}
 
 	async connect(profileId: string): Promise<void> {
 		const state = this.states.get(profileId);
-		if (!state) return;
+		const profile = this.profiles.find((candidate) => candidate.id === profileId);
+		if (!state || !profile) return;
+		const password = this.sessionPasswords.get(profileId);
+		if (!password) {
+			state.status = 'error';
+			state.lastError = 'Enter the bastion password before connecting.';
+			this.states = new Map(this.states);
+			return;
+		}
 
 		state.status = 'connecting';
 		state.lastError = null;
 		this.states = new Map(this.states);
 
-		// TODO: In production, invoke Tauri command to create SSH tunnel
-		// For now, simulate connection
-		await new Promise((resolve) => setTimeout(resolve, 1500));
-
-		state.status = 'connected';
-		state.connectedAt = Date.now();
-		state.latencyMs = Math.floor(Math.random() * 50) + 10;
-		this.states = new Map(this.states);
-
-		this.events = [
-			...this.events,
-			{
-				type: 'connected',
-				profileId,
-				timestamp: Date.now(),
-				message: `Connected to ${this.profiles.find((p) => p.id === profileId)?.bastionHost}`,
-			},
-		];
+		try {
+			await invoke('bastion_connect', {
+				host: profile.bastionHost,
+				port: profile.bastionPort,
+				username: profile.bastionUsername,
+				password,
+			});
+			for (const candidate of this.states.values()) {
+				candidate.status = candidate.profileId === profileId ? 'connected' : 'disconnected';
+				candidate.connectedAt = candidate.profileId === profileId ? Date.now() : null;
+				candidate.lastError = null;
+			}
+			this.states = new Map(this.states);
+			this.events = [...this.events, {
+				type: 'connected', profileId, timestamp: Date.now(), message: `Connected to ${profile.bastionHost}`,
+			}];
+		} catch (error) {
+			state.status = 'error';
+			state.lastError = error instanceof Error ? error.message : String(error);
+			this.states = new Map(this.states);
+			this.events = [...this.events, {
+				type: 'error', profileId, timestamp: Date.now(), message: state.lastError,
+			}];
+		}
 	}
 
 	async disconnect(profileId: string): Promise<void> {
 		const state = this.states.get(profileId);
 		if (!state) return;
 
-		// TODO: In production, invoke Tauri command to close SSH tunnel
+		try {
+			await invoke('bastion_disconnect');
+		} catch (error) {
+			state.status = 'error';
+			state.lastError = error instanceof Error ? error.message : String(error);
+			this.states = new Map(this.states);
+			return;
+		}
 		state.status = 'disconnected';
 		state.connectedAt = null;
 		state.latencyMs = null;

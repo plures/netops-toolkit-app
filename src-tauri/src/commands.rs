@@ -49,6 +49,103 @@ const PYTHON: &str = "python3";
 /// Holds an optional sender that, when fired, cancels the running scan.
 pub struct ScanCancelState(pub Arc<Mutex<Option<oneshot::Sender<()>>>>);
 
+/// The current workstation-wide SSH bastion selected by the user.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BastionStatus {
+    pub connected: bool,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub username: Option<String>,
+}
+
+/// Start the Python-owned local bastion service. The password is written only
+/// to the child process stdin; it is never placed in command-line arguments or
+/// local app storage.
+#[tauri::command]
+pub async fn bastion_connect(
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+) -> Result<BastionStatus, String> {
+    if host.trim().is_empty() || username.trim().is_empty() || password.is_empty() {
+        return Err("Bastion host, username, and password are required".into());
+    }
+
+    let mut child = Command::new(PYTHON)
+        .args([
+            "-m",
+            "netops.core.bastion",
+            "connect",
+            "--host",
+            host.trim(),
+            "--port",
+            &port.to_string(),
+            "--username",
+            username.trim(),
+            "--password-stdin",
+        ])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start netops bastion service: {e}"))?;
+
+    use tokio::io::AsyncWriteExt;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(format!("{password}\n").as_bytes())
+            .await
+            .map_err(|e| format!("Failed to provide bastion credentials: {e}"))?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("Failed to wait for bastion service: {e}"))?;
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if error.is_empty() {
+            "Bastion connection failed".into()
+        } else {
+            error
+        });
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|_| "Failed to parse bastion connection response".into())
+}
+
+/// Return the live status of the shared local bastion service.
+#[tauri::command]
+pub async fn bastion_status() -> Result<BastionStatus, String> {
+    let output = Command::new(PYTHON)
+        .args(["-m", "netops.core.bastion", "status"])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to query bastion status: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|_| "Failed to parse bastion status response".into())
+}
+
+/// Disconnect the shared local bastion service.
+#[tauri::command]
+pub async fn bastion_disconnect() -> Result<(), String> {
+    let output = Command::new(PYTHON)
+        .args(["-m", "netops.core.bastion", "disconnect"])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to disconnect bastion: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tauri event payload types (must match src/lib/types.ts)
 // ---------------------------------------------------------------------------
