@@ -46,6 +46,14 @@ export interface TunnelEvent {
 	latencyMs?: number;
 }
 
+/** Live status payload returned by the Tauri `bastion_*` commands. */
+export interface BastionStatus {
+	connected: boolean;
+	host: string | null;
+	port: number | null;
+	username: string | null;
+}
+
 // ─── Default Profile ────────────────────────────────────────────────────────
 
 export function createDefaultProfile(): Omit<TunnelProfile, 'id'> {
