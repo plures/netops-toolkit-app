@@ -158,6 +158,8 @@ class TunnelStore {
 	async deleteProfile(id: string): Promise<void> {
 		const state = this.states.get(id);
 		if (state?.status === 'connected') {
+			if (this.busy) return;
+			this.busy = true;
 			try {
 				await invoke('bastion_disconnect');
 			} catch (error) {
@@ -165,6 +167,8 @@ class TunnelStore {
 				state.lastError = error instanceof Error ? error.message : String(error);
 				this.states = new Map(this.states);
 				return;
+			} finally {
+				this.busy = false;
 			}
 		}
 		this.profiles = this.profiles.filter((p) => p.id !== id);
