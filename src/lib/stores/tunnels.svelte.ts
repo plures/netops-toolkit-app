@@ -3,16 +3,10 @@ import type {
 	TunnelState,
 	TunnelEvent,
 	TunnelStatus,
+	BastionStatus,
 } from '$lib/types/tunnel.types.js';
 import { createDefaultProfile } from '$lib/types/tunnel.types.js';
 import { invoke } from '@tauri-apps/api/core';
-
-interface BastionStatus {
-	connected: boolean;
-	host: string | null;
-	port: number | null;
-	username: string | null;
-}
 
 const TUNNEL_STORAGE_KEY = 'netops-toolkit-tunnels';
 
@@ -22,6 +16,9 @@ class TunnelStore {
 	profiles = $state<TunnelProfile[]>([]);
 	states = $state<Map<string, TunnelState>>(new Map());
 	events = $state<TunnelEvent[]>([]);
+	/** True while a bastion connect/disconnect operation is in flight. Serializes
+	 * workstation-wide service calls so overlapping actions cannot race. */
+	busy = $state(false);
 	private readonly sessionPasswords = new Map<string, string>();
 
 	constructor() {
@@ -110,14 +107,66 @@ class TunnelStore {
 		return newProfile;
 	}
 
-	updateProfile(id: string, updates: Partial<TunnelProfile>): void {
+	/**
+	 * Update a saved profile. If the bastion identity (host, port, or
+	 * username) changes, any active/connecting service state is disconnected
+	 * (or otherwise marked disconnected) since the daemon still targets the
+	 * old endpoint, and the cached session password is cleared unless
+	 * `newPassword` supplies a replacement for the new identity.
+	 */
+	async updateProfile(
+		id: string,
+		updates: Partial<TunnelProfile>,
+		newPassword?: string,
+	): Promise<void> {
+		const existing = this.profiles.find((p) => p.id === id);
+		const identityChanged = !!existing && (
+			(updates.bastionHost !== undefined && updates.bastionHost !== existing.bastionHost)
+			|| (updates.bastionPort !== undefined && updates.bastionPort !== existing.bastionPort)
+			|| (updates.bastionUsername !== undefined && updates.bastionUsername !== existing.bastionUsername)
+		);
+
 		this.profiles = this.profiles.map((p) =>
 			p.id === id ? { ...p, ...updates } : p,
 		);
 		this.save();
+
+		if (newPassword) {
+			this.setSessionPassword(id, newPassword);
+		} else if (identityChanged) {
+			this.setSessionPassword(id, '');
+		}
+
+		if (!identityChanged) return;
+		const state = this.states.get(id);
+		if (!state) return;
+		if (state.status === 'connected' || state.status === 'connecting') {
+			await this.disconnect(id);
+		} else if (state.status !== 'disconnected') {
+			state.status = 'disconnected';
+			state.lastError = null;
+			this.states = new Map(this.states);
+		}
 	}
 
-	deleteProfile(id: string): void {
+	/**
+	 * Delete a saved profile. If it is currently connected, the shared
+	 * bastion service is disconnected first; deletion is rejected (the
+	 * profile is kept, with an actionable error) if that disconnect fails,
+	 * so the workstation-wide daemon can never outlive its only UI control.
+	 */
+	async deleteProfile(id: string): Promise<void> {
+		const state = this.states.get(id);
+		if (state?.status === 'connected') {
+			try {
+				await invoke('bastion_disconnect');
+			} catch (error) {
+				state.status = 'error';
+				state.lastError = error instanceof Error ? error.message : String(error);
+				this.states = new Map(this.states);
+				return;
+			}
+		}
 		this.profiles = this.profiles.filter((p) => p.id !== id);
 		this.states.delete(id);
 		this.sessionPasswords.delete(id);
@@ -160,6 +209,8 @@ class TunnelStore {
 			this.states = new Map(this.states);
 			return;
 		}
+		if (this.busy) return;
+		this.busy = true;
 
 		state.status = 'connecting';
 		state.lastError = null;
@@ -188,12 +239,16 @@ class TunnelStore {
 			this.events = [...this.events, {
 				type: 'error', profileId, timestamp: Date.now(), message: state.lastError,
 			}];
+		} finally {
+			this.busy = false;
 		}
 	}
 
 	async disconnect(profileId: string): Promise<void> {
 		const state = this.states.get(profileId);
 		if (!state) return;
+		if (this.busy) return;
+		this.busy = true;
 
 		try {
 			await invoke('bastion_disconnect');
@@ -202,6 +257,8 @@ class TunnelStore {
 			state.lastError = error instanceof Error ? error.message : String(error);
 			this.states = new Map(this.states);
 			return;
+		} finally {
+			this.busy = false;
 		}
 		state.status = 'disconnected';
 		state.connectedAt = null;

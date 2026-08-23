@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Button, Badge, Table, StatusBar, StatusBarItem, StatusBarSpacer } from '@plures/design-dojo';
+	import { Button, Badge, Table, StatusBar, StatusBarItem, StatusBarSpacer, Input } from '@plures/design-dojo';
 	import { useTui } from '@plures/design-dojo';
 	import { tunnelStore } from '$lib/stores/tunnels.svelte.js';
 	import { createDefaultProfile, type TunnelProfile } from '$lib/types/tunnel.types.js';
@@ -72,7 +72,7 @@
 		view = 'form';
 	}
 
-	function handleSave(): void {
+	async function handleSave(): Promise<void> {
 		if (!formName.trim()) { errorMsg = 'Name is required.'; return; }
 		if (!formBastionHost.trim()) { errorMsg = 'Bastion host is required.'; return; }
 		if (!formBastionUsername.trim()) { errorMsg = 'Username is required.'; return; }
@@ -95,8 +95,7 @@
 		};
 
 		if (editingId) {
-			tunnelStore.updateProfile(editingId, data);
-			if (formBastionPassword) tunnelStore.setSessionPassword(editingId, formBastionPassword);
+			await tunnelStore.updateProfile(editingId, data, formBastionPassword || undefined);
 		} else {
 			const profile = tunnelStore.addProfile(data);
 			if (formBastionPassword) tunnelStore.setSessionPassword(profile.id, formBastionPassword);
@@ -104,8 +103,8 @@
 		view = 'list';
 	}
 
-	function handleDelete(id: string): void {
-		tunnelStore.deleteProfile(id);
+	async function handleDelete(id: string): Promise<void> {
+		await tunnelStore.deleteProfile(id);
 	}
 
 	function handleSelectRow(index: number): void {
@@ -147,16 +146,19 @@
 					{#if state?.latencyMs}
 						<span class="tui-latency">{state.latencyMs}ms</span>
 					{/if}
-					{#if state?.status === 'disconnected'}
-						<span role="button" tabindex="0"
-							onclick={() => tunnelStore.connect(profile.id)}
-							onkeydown={(e) => { if (e.key === 'Enter') tunnelStore.connect(profile.id); }}
-						>[C] Connect</span>
+					{#if state?.status === 'disconnected' || state?.status === 'error'}
+						<span role="button" tabindex="0" aria-disabled={tunnelStore.busy}
+							onclick={() => { if (!tunnelStore.busy) tunnelStore.connect(profile.id); }}
+							onkeydown={(e) => { if (e.key === 'Enter' && !tunnelStore.busy) tunnelStore.connect(profile.id); }}
+						>[C] {state?.status === 'error' ? 'Retry' : 'Connect'}</span>
 					{:else if state?.status === 'connected'}
-						<span role="button" tabindex="0"
-							onclick={() => tunnelStore.disconnect(profile.id)}
-							onkeydown={(e) => { if (e.key === 'Enter') tunnelStore.disconnect(profile.id); }}
+						<span role="button" tabindex="0" aria-disabled={tunnelStore.busy}
+							onclick={() => { if (!tunnelStore.busy) tunnelStore.disconnect(profile.id); }}
+							onkeydown={(e) => { if (e.key === 'Enter' && !tunnelStore.busy) tunnelStore.disconnect(profile.id); }}
 						>[D] Disconnect</span>
+					{/if}
+					{#if state?.status === 'error' && state.lastError}
+						<span class="tui-latency">{state.lastError}</span>
 					{/if}
 				</div>
 			{/each}
@@ -185,8 +187,9 @@
 				<div class="form-row">
 					<label for="t-user">Username: </label>
 					<input id="t-user" type="text" bind:value={formBastionUsername} class="tui-input" aria-label="Username" />
-					<label for="t-password">Password: </label>
-					<input id="t-password" type="password" bind:value={formBastionPassword} class="tui-input" aria-label="Bastion password" />
+				</div>
+				<div class="form-row">
+					<Input label="Password" password bind:value={formBastionPassword} placeholder="Stored only for this session" />
 				</div>
 				{#if errorMsg}<div class="tui-error">{errorMsg}</div>{/if}
 				<div class="tui-actions">
@@ -233,8 +236,7 @@
 						<input id="gui-t-user" type="text" bind:value={formBastionUsername} placeholder="admin" class="text-input" />
 					</div>
 					<div class="field">
-						<label for="gui-t-password">Password</label>
-						<input id="gui-t-password" type="password" bind:value={formBastionPassword} placeholder="Stored only for this app session" class="text-input" />
+						<Input label="Password" password bind:value={formBastionPassword} placeholder="Stored only for this app session" />
 					</div>
 				</div>
 
@@ -265,20 +267,28 @@
 							<dd class="mono">{profile.bastionUsername}@{profile.bastionHost}:{profile.bastionPort}</dd>
 						</dl>
 
+						{#if state?.status === 'error' && state.lastError}
+							<p class="error-msg">{state.lastError}</p>
+						{/if}
+
 						<div class="tunnel-actions">
 							{#if state?.status === 'disconnected'}
-								<Button variant="solid" onclick={() => tunnelStore.connect(profile.id)}>
+								<Button variant="solid" onclick={() => tunnelStore.connect(profile.id)} disabled={tunnelStore.busy}>
 									▶ Connect
 								</Button>
 							{:else if state?.status === 'connected'}
-								<Button variant="ghost" onclick={() => tunnelStore.disconnect(profile.id)}>
+								<Button variant="ghost" onclick={() => tunnelStore.disconnect(profile.id)} disabled={tunnelStore.busy}>
 									⏹ Disconnect
 								</Button>
 							{:else if state?.status === 'connecting'}
 								<Button variant="ghost" disabled={true}>⏳ Connecting…</Button>
+							{:else if state?.status === 'error'}
+								<Button variant="solid" onclick={() => tunnelStore.connect(profile.id)} disabled={tunnelStore.busy}>
+									↻ Retry
+								</Button>
 							{/if}
 							<Button variant="ghost" onclick={() => openEditForm(profile)}>✏️ Edit</Button>
-							<Button variant="ghost" onclick={() => handleDelete(profile.id)}>🗑 Delete</Button>
+							<Button variant="ghost" onclick={() => handleDelete(profile.id)} disabled={tunnelStore.busy}>🗑 Delete</Button>
 						</div>
 					</div>
 				{/each}

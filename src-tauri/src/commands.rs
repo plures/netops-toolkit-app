@@ -63,6 +63,7 @@ pub struct BastionStatus {
 /// to the child process stdin; it is never placed in command-line arguments or
 /// local app storage.
 #[tauri::command]
+#[tracing::instrument(skip(password), err)]
 pub async fn bastion_connect(
     host: String,
     port: u16,
@@ -118,6 +119,7 @@ pub async fn bastion_connect(
 
 /// Return the live status of the shared local bastion service.
 #[tauri::command]
+#[tracing::instrument(err)]
 pub async fn bastion_status() -> Result<BastionStatus, String> {
     let output = Command::new(PYTHON)
         .args(["-m", "netops.core.bastion", "status"])
@@ -133,6 +135,7 @@ pub async fn bastion_status() -> Result<BastionStatus, String> {
 
 /// Disconnect the shared local bastion service.
 #[tauri::command]
+#[tracing::instrument(err)]
 pub async fn bastion_disconnect() -> Result<(), String> {
     let output = Command::new(PYTHON)
         .args(["-m", "netops.core.bastion", "disconnect"])
