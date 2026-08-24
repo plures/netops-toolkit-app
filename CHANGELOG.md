@@ -1,3 +1,9 @@
+## [0.30.1] — 2026-08-24
+
+- ci(release): retire diverged release-preparation branches before release (#74) (5b8893d)
+- fix(release): publish Windows installer for stable releases (#73) (676e837)
+- fix(release): disable npm publishing and require per-user installs (#71) (72b75ce)
+
 ## [0.30.0] — 2026-08-24
 
 - Update release.yml to include pull-requests permission (84b2e98)
