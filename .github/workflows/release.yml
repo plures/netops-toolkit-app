@@ -56,7 +56,8 @@ jobs:
           fi
 
           for BRANCH in $BRANCHES; do
-            STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE_SHA}...${BRANCH}" --jq '.status')
+            ENCODED_BRANCH=$(jq -rn --arg branch "$BRANCH" '$branch | @uri')
+            STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE_SHA}...${ENCODED_BRANCH}" --jq '.status')
             case "$STATUS" in
               identical|behind)
                 echo "$BRANCH is contained in $BASE_SHA; keeping it."
