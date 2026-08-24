@@ -1,3 +1,7 @@
+## [0.30.1] — 2026-08-24
+
+- fix(release): disable npm publishing and require per-user installs (#71) (72b75ce)
+
 ## [0.30.0] — 2026-08-24
 
 - Update release.yml to include pull-requests permission (84b2e98)
