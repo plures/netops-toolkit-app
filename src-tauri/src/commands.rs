@@ -273,11 +273,7 @@ impl ScanArgs {
 
 /// Spawns `python3` with the given arguments, reads JSONL output line-by-line,
 /// and emits Tauri events.  If `cancel_rx` fires, kills the child process.
-async fn run_scan(
-    app: AppHandle,
-    python_args: ScanArgs,
-    cancel_rx: oneshot::Receiver<()>,
-) {
+async fn run_scan(app: AppHandle, python_args: ScanArgs, cancel_rx: oneshot::Receiver<()>) {
     let start = std::time::Instant::now();
 
     let child = Command::new(PYTHON)
@@ -290,9 +286,13 @@ async fn run_scan(
     let mut child = match child {
         Ok(c) => c,
         Err(e) => {
-            // python3 / netops-toolkit not available — emit mock data for dev
-            run_mock_scan(app, cancel_rx).await;
-            let _ = e;
+            let _ = app.emit(
+                "scan:error",
+                ScanErrorEvent {
+                    message: format!("Unable to start the netops backend: {e}"),
+                    ip: None,
+                },
+            );
             return;
         }
     };
@@ -339,12 +339,27 @@ async fn run_scan(
                         }
                     }
                     Ok(None) => {
-                        // Process exited — emit complete if not already done
-                        let duration_ms = start.elapsed().as_millis() as u64;
-                        let _ = app.emit("scan:complete", CompleteEvent {
-                            total_devices: 0,
-                            duration_ms,
-                        });
+                        match child.wait().await {
+                            Ok(status) if status.success() => {
+                                let duration_ms = start.elapsed().as_millis() as u64;
+                                let _ = app.emit("scan:complete", CompleteEvent {
+                                    total_devices: 0,
+                                    duration_ms,
+                                });
+                            }
+                            Ok(status) => {
+                                let _ = app.emit("scan:error", ScanErrorEvent {
+                                    message: format!("The netops backend exited with {status}"),
+                                    ip: None,
+                                });
+                            }
+                            Err(e) => {
+                                let _ = app.emit("scan:error", ScanErrorEvent {
+                                    message: format!("Unable to wait for the netops backend: {e}"),
+                                    ip: None,
+                                });
+                            }
+                        }
                         break;
                     }
                     Err(e) => {
@@ -358,6 +373,10 @@ async fn run_scan(
             }
         }
     }
+}
+
+fn sidecar_unavailable(operation: &str) -> String {
+    format!("{operation} is unavailable because the netops backend did not return a valid response")
 }
 
 // ---------------------------------------------------------------------------
@@ -598,8 +617,7 @@ pub async fn get_device_detail(hostname: String) -> Result<DeviceDetail, String>
         }
     }
 
-    // Fall back to mock data
-    Ok(mock_device_detail(&hostname))
+    Err(sidecar_unavailable("Device detail"))
 }
 
 /// Retrieve live health metrics (CPU, memory, temperature) for `hostname`.
@@ -628,7 +646,7 @@ pub async fn get_device_health(hostname: String) -> Result<HealthInfo, String> {
         }
     }
 
-    Ok(mock_health(&hostname))
+    Err(sidecar_unavailable("Device health"))
 }
 
 // ---------------------------------------------------------------------------
@@ -817,7 +835,7 @@ pub async fn get_fleet_health() -> Result<FleetHealth, String> {
         }
     }
 
-    Ok(mock_fleet_health())
+    Err(sidecar_unavailable("Fleet health"))
 }
 
 fn mock_fleet_health() -> FleetHealth {
@@ -1042,7 +1060,7 @@ pub async fn get_bgp_summary(hostname: Option<String>) -> Result<Vec<BgpSummaryP
         }
     }
 
-    Ok(mock_bgp_summary(hostname.as_deref()))
+    Err(sidecar_unavailable("BGP summary"))
 }
 
 /// Get detailed BGP neighbor session information for a hostname.
@@ -1076,7 +1094,7 @@ pub async fn get_bgp_neighbors(hostname: String) -> Result<Vec<BgpNeighborDetail
         }
     }
 
-    Ok(mock_bgp_neighbors(&hostname))
+    Err(sidecar_unavailable("BGP neighbor detail"))
 }
 
 fn mock_bgp_summary(hostname: Option<&str>) -> Vec<BgpSummaryPeer> {
@@ -1234,7 +1252,9 @@ fn mock_bgp_neighbors(hostname: &str) -> Vec<BgpNeighborDetail> {
         },
     ];
 
-    all.into_iter().filter(|neighbor| neighbor.hostname == hostname).collect()
+    all.into_iter()
+        .filter(|neighbor| neighbor.hostname == hostname)
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -1365,7 +1385,7 @@ pub async fn backup_config(hostname: String) -> Result<ConfigBackup, String> {
         }
     }
 
-    Ok(mock_backup(&hostname))
+    Err(sidecar_unavailable("Configuration backup"))
 }
 
 /// List stored config backups, optionally filtered by hostname.
@@ -1395,7 +1415,7 @@ pub async fn list_backups(hostname: Option<String>) -> Result<Vec<ConfigBackup>,
         }
     }
 
-    Ok(mock_backup_list(hostname.as_deref()))
+    Err(sidecar_unavailable("Configuration backup list"))
 }
 
 /// Compute a diff between two config versions for a device.
@@ -1446,7 +1466,7 @@ pub async fn diff_configs(
         }
     }
 
-    Ok(mock_diff(&hostname, &version_a, &version_b))
+    Err(sidecar_unavailable("Configuration diff"))
 }
 
 /// Rollback a device config to a previous version.
@@ -1485,7 +1505,7 @@ pub async fn rollback_config(hostname: String, version: String) -> Result<Rollba
         }
     }
 
-    Ok(mock_rollback(&hostname, &version))
+    Err(sidecar_unavailable("Configuration rollback"))
 }
 
 /// Create a config change plan for selected devices and commands.
@@ -1510,7 +1530,12 @@ pub async fn create_change_plan(
         return Err("Commands must not be empty".into());
     }
 
-    let mut args = vec!["-m".into(), "netops.change.plan".into(), "--format".into(), "json".into()];
+    let mut args = vec![
+        "-m".into(),
+        "netops.change.plan".into(),
+        "--format".into(),
+        "json".into(),
+    ];
     for device in &devices {
         args.push("--device".into());
         args.push(device.clone());
@@ -1530,7 +1555,7 @@ pub async fn create_change_plan(
         }
     }
 
-    Ok(mock_change_plan(devices, commands))
+    Err(sidecar_unavailable("Change plan"))
 }
 
 /// Execute a prepared config change plan.
@@ -1563,7 +1588,7 @@ pub async fn push_config(plan_id: String) -> Result<ChangePushResult, String> {
         }
     }
 
-    Ok(mock_change_push(&plan_id))
+    Err(sidecar_unavailable("Configuration push"))
 }
 
 /// Get pre/post diff for a config change plan.
@@ -1596,7 +1621,7 @@ pub async fn get_change_diff(plan_id: String) -> Result<ChangeDiffResult, String
         }
     }
 
-    Ok(mock_change_diff(&plan_id))
+    Err(sidecar_unavailable("Change pre/post diff"))
 }
 
 /// Roll back a previously executed config change plan.
@@ -1629,7 +1654,7 @@ pub async fn rollback_change(plan_id: String) -> Result<ChangeRollbackResult, St
         }
     }
 
-    Ok(mock_change_rollback(&plan_id))
+    Err(sidecar_unavailable("Change rollback"))
 }
 
 // ---------------------------------------------------------------------------
@@ -1831,7 +1856,9 @@ fn validate_subnet(subnet: &str) -> Result<(), String> {
     // Basic CIDR validation: <ip>/<prefix>
     let parts: Vec<&str> = subnet.split('/').collect();
     if parts.len() != 2 {
-        return Err(format!("Invalid subnet '{subnet}': expected CIDR notation (e.g. 10.0.0.0/24)"));
+        return Err(format!(
+            "Invalid subnet '{subnet}': expected CIDR notation (e.g. 10.0.0.0/24)"
+        ));
     }
 
     let ip_parts: Vec<&str> = parts[0].split('.').collect();
@@ -1940,8 +1967,7 @@ pub struct VaultResolveResult {
 /// Initialise the encrypted credential vault with a new master password.
 ///
 /// Calls `python3 -m netops.core.vault init`.
-/// Falls back to a mock "vault created" response only when the sidecar cannot be spawned
-/// (i.e. netops-toolkit is not installed) so the UI remains usable in offline/dev mode.
+/// Returns an error when the backend is unavailable; a vault is never simulated.
 #[tauri::command]
 pub async fn vault_init(password: String) -> Result<VaultStatus, String> {
     if password.chars().count() < 8 {
@@ -1956,13 +1982,7 @@ pub async fn vault_init(password: String) -> Result<VaultStatus, String> {
         .spawn();
 
     match spawn_result {
-        Err(_) => {
-            // Sidecar unavailable — fall back to mock so offline/dev mode works.
-            Ok(VaultStatus {
-                unlocked: true,
-                credential_count: 0,
-            })
-        }
+        Err(_) => Err(sidecar_unavailable("Vault initialisation")),
         Ok(mut child) => {
             use tokio::io::AsyncWriteExt;
             if let Some(stdin) = child.stdin.take() {
@@ -1994,8 +2014,7 @@ pub async fn vault_init(password: String) -> Result<VaultStatus, String> {
 /// Unlock the vault using the master password; session-cached on success.
 ///
 /// Calls `python3 -m netops.core.vault unlock --format json`.
-/// Falls back to mock data only when the sidecar cannot be spawned; returns an error
-/// for all other failures (e.g. wrong password) so the frontend can surface them.
+/// Returns an error for all backend failures (including an unavailable sidecar).
 #[tauri::command]
 pub async fn vault_unlock(password: String) -> Result<VaultStatus, String> {
     if password.is_empty() {
@@ -2010,13 +2029,7 @@ pub async fn vault_unlock(password: String) -> Result<VaultStatus, String> {
         .spawn();
 
     match spawn_result {
-        Err(_) => {
-            // Sidecar unavailable — fall back to mock so offline/dev mode works.
-            Ok(VaultStatus {
-                unlocked: true,
-                credential_count: 4,
-            })
-        }
+        Err(_) => Err(sidecar_unavailable("Vault unlock")),
         Ok(mut child) => {
             use tokio::io::AsyncWriteExt;
 
@@ -2053,7 +2066,7 @@ pub async fn vault_unlock(password: String) -> Result<VaultStatus, String> {
 /// List all stored credentials (passwords are always masked).
 ///
 /// Calls `python3 -m netops.core.vault list --format json`.
-/// Falls back to mock data only when the sidecar cannot be spawned.
+/// Returns an error when the sidecar cannot be reached.
 #[tauri::command]
 pub async fn vault_list() -> Result<Vec<VaultCredential>, String> {
     match Command::new(PYTHON)
@@ -2061,10 +2074,7 @@ pub async fn vault_list() -> Result<Vec<VaultCredential>, String> {
         .output()
         .await
     {
-        Err(_) => {
-            // Sidecar unavailable — return mock data for offline/dev mode.
-            Ok(mock_vault_credentials())
-        }
+        Err(_) => Err(sidecar_unavailable("Vault credential list")),
         Ok(out) => {
             if out.status.success() {
                 let text = String::from_utf8_lossy(&out.stdout);
@@ -2085,8 +2095,7 @@ pub async fn vault_list() -> Result<Vec<VaultCredential>, String> {
 /// Create or update a credential in the vault.
 ///
 /// Calls `python3 -m netops.core.vault set --format json`.
-/// Falls back to a mock credential only when the sidecar cannot be spawned;
-/// returns an error when the sidecar runs but fails (fail-closed for writes).
+/// Returns an error when the sidecar cannot be spawned or fails.
 #[tauri::command]
 pub async fn vault_set(payload: VaultSetPayload) -> Result<VaultCredential, String> {
     if payload.username.trim().is_empty() {
@@ -2097,8 +2106,17 @@ pub async fn vault_set(payload: VaultSetPayload) -> Result<VaultCredential, Stri
             return Err("Password must not be empty".into());
         }
     }
-    if matches!(payload.scope, CredentialScope::Group | CredentialScope::Device) {
-        if payload.target.as_deref().map(str::trim).unwrap_or("").is_empty() {
+    if matches!(
+        payload.scope,
+        CredentialScope::Group | CredentialScope::Device
+    ) {
+        if payload
+            .target
+            .as_deref()
+            .map(str::trim)
+            .unwrap_or("")
+            .is_empty()
+        {
             return Err("Target must be specified for group or device scope".into());
         }
     }
@@ -2114,26 +2132,7 @@ pub async fn vault_set(payload: VaultSetPayload) -> Result<VaultCredential, Stri
         .spawn();
 
     match spawn_result {
-        Err(_) => {
-            // Sidecar unavailable — echo back a mock credential for offline/dev mode.
-            let id = format!(
-                "{}-{}",
-                match payload.scope {
-                    CredentialScope::Default => "default",
-                    CredentialScope::Group => "group",
-                    CredentialScope::Device => "device",
-                },
-                payload.target.as_deref().unwrap_or("new")
-            );
-            Ok(VaultCredential {
-                id,
-                scope: payload.scope,
-                target: payload.target,
-                username: payload.username,
-                auth_method: payload.auth_method,
-                has_enable_secret: payload.enable_secret.is_some(),
-            })
-        }
+        Err(_) => Err(sidecar_unavailable("Vault credential update")),
         Ok(mut child) => {
             use tokio::io::AsyncWriteExt;
             if let Some(stdin) = child.stdin.take() {
@@ -2165,7 +2164,7 @@ pub async fn vault_set(payload: VaultSetPayload) -> Result<VaultCredential, Stri
 /// Delete a credential from the vault by scope and optional target.
 ///
 /// Calls `python3 -m netops.core.vault delete --scope <scope> [--target <target>] --format json`.
-/// Falls back silently when the sidecar is unavailable.
+/// Returns an error when the sidecar cannot confirm the deletion.
 #[tauri::command]
 pub async fn vault_delete(scope: CredentialScope, target: Option<String>) -> Result<(), String> {
     if matches!(scope, CredentialScope::Group | CredentialScope::Device)
@@ -2181,13 +2180,7 @@ pub async fn vault_delete(scope: CredentialScope, target: Option<String>) -> Res
     };
 
     let mut cmd = Command::new(PYTHON);
-    cmd.args([
-        "-m",
-        "netops.core.vault",
-        "delete",
-        "--scope",
-        scope_arg,
-    ]);
+    cmd.args(["-m", "netops.core.vault", "delete", "--scope", scope_arg]);
     if let Some(target_value) = target.as_deref() {
         let trimmed = target_value.trim();
         if !trimmed.is_empty() {
@@ -2204,15 +2197,14 @@ pub async fn vault_delete(scope: CredentialScope, target: Option<String>) -> Res
         }
     }
 
-    // Mock: pretend deletion succeeded
-    Ok(())
+    Err(sidecar_unavailable("Vault credential deletion"))
 }
 
 /// Preview which credential would be resolved for the given hostname
 /// (default → group → device hierarchy).
 ///
 /// Calls `python3 -m netops.core.vault resolve --hostname <hostname> --format json`.
-/// Falls back to mock data when the sidecar is unavailable.
+/// Returns an error when the sidecar is unavailable.
 #[tauri::command]
 pub async fn vault_resolve(hostname: String) -> Result<VaultResolveResult, String> {
     if hostname.trim().is_empty() {
@@ -2241,7 +2233,7 @@ pub async fn vault_resolve(hostname: String) -> Result<VaultResolveResult, Strin
         }
     }
 
-    Ok(mock_vault_resolve(&hostname))
+    Err(sidecar_unavailable("Vault credential resolution"))
 }
 
 // ---------------------------------------------------------------------------
@@ -2289,16 +2281,14 @@ fn mock_vault_resolve(hostname: &str) -> VaultResolveResult {
     let creds = mock_vault_credentials();
 
     // device-specific match
-    if let Some(cred) = creds.iter().find(|c| {
-        c.scope == CredentialScope::Device
-            && c.target.as_deref() == Some(hostname)
-    }) {
+    if let Some(cred) = creds
+        .iter()
+        .find(|c| c.scope == CredentialScope::Device && c.target.as_deref() == Some(hostname))
+    {
         return VaultResolveResult {
             hostname: hostname.into(),
             resolved: Some(cred.clone()),
-            explanation: format!(
-                "Device-specific credential matched for \"{hostname}\"."
-            ),
+            explanation: format!("Device-specific credential matched for \"{hostname}\"."),
         };
     }
 
@@ -2324,16 +2314,11 @@ fn mock_vault_resolve(hostname: &str) -> VaultResolveResult {
     }
 
     // default fallback
-    if let Some(cred) = creds
-        .iter()
-        .find(|c| c.scope == CredentialScope::Default)
-    {
+    if let Some(cred) = creds.iter().find(|c| c.scope == CredentialScope::Default) {
         return VaultResolveResult {
             hostname: hostname.into(),
             resolved: Some(cred.clone()),
-            explanation: format!(
-                "No specific credential found; using default for \"{hostname}\"."
-            ),
+            explanation: format!("No specific credential found; using default for \"{hostname}\"."),
         };
     }
 
@@ -2410,6 +2395,7 @@ pub async fn export_ansible_inventory(
     format: String,
     filter: Option<InventoryFilter>,
 ) -> Result<AnsibleInventory, String> {
+    let _ = &format;
     // Always request JSON from the Python sidecar so we can reliably
     // deserialize with serde_json, regardless of the requested output format.
     let mut args = vec![
@@ -2436,10 +2422,7 @@ pub async fn export_ansible_inventory(
         }
     }
 
-    let output = Command::new(PYTHON)
-        .args(&args)
-        .output()
-        .await;
+    let output = Command::new(PYTHON).args(&args).output().await;
 
     if let Ok(out) = output {
         if out.status.success() {
@@ -2450,7 +2433,7 @@ pub async fn export_ansible_inventory(
         }
     }
 
-    Ok(mock_ansible_inventory(&format, &filter))
+    Err(sidecar_unavailable("Ansible inventory generation"))
 }
 
 /// Generate an Ansible playbook from a template and device list.
@@ -2488,10 +2471,7 @@ pub async fn generate_playbook(
         }
     }
 
-    let output = Command::new(PYTHON)
-        .args(&args)
-        .output()
-        .await;
+    let output = Command::new(PYTHON).args(&args).output().await;
 
     if let Ok(out) = output {
         if out.status.success() {
@@ -2502,7 +2482,7 @@ pub async fn generate_playbook(
         }
     }
 
-    Ok(mock_generate_playbook(&devices, &template, &variables))
+    Err(sidecar_unavailable("Playbook generation"))
 }
 
 /// List available playbook templates.
@@ -2531,7 +2511,7 @@ pub async fn list_playbook_templates() -> Result<Vec<PlaybookTemplate>, String> 
         }
     }
 
-    Ok(mock_playbook_templates())
+    Err(sidecar_unavailable("Playbook template listing"))
 }
 
 // ---------------------------------------------------------------------------
@@ -2551,21 +2531,141 @@ struct MockDevice {
 
 fn mock_device_list() -> Vec<MockDevice> {
     vec![
-        MockDevice { hostname: "core-rtr-01", ip: "10.0.0.1", vendor: "cisco_ios", model: "ASR1001-X", serial: "FXS2208Q1GD", site: "NYC-DC1", network_os: "ios" },
-        MockDevice { hostname: "core-rtr-02", ip: "10.0.0.2", vendor: "cisco_ios", model: "ASR1001-X", serial: "FXS2208Q1GE", site: "NYC-DC1", network_os: "ios" },
-        MockDevice { hostname: "edge-rtr-01", ip: "10.0.1.1", vendor: "nokia_sros", model: "7750 SR-12", serial: "NS22010001", site: "NYC-DC1", network_os: "sros" },
-        MockDevice { hostname: "edge-rtr-02", ip: "10.0.1.2", vendor: "nokia_sros", model: "7750 SR-12", serial: "NS22010002", site: "LON-DC2", network_os: "sros" },
-        MockDevice { hostname: "spine-sw-01", ip: "10.1.0.1", vendor: "arista_eos", model: "DCS-7050CX3-32S", serial: "HSH21270001", site: "NYC-DC1", network_os: "eos" },
-        MockDevice { hostname: "spine-sw-02", ip: "10.1.0.2", vendor: "arista_eos", model: "DCS-7050CX3-32S", serial: "HSH21270002", site: "LON-DC2", network_os: "eos" },
-        MockDevice { hostname: "leaf-sw-01", ip: "10.1.1.1", vendor: "arista_eos", model: "DCS-7020R-48S2-R", serial: "HSH20100011", site: "NYC-DC1", network_os: "eos" },
-        MockDevice { hostname: "leaf-sw-02", ip: "10.1.1.2", vendor: "arista_eos", model: "DCS-7020R-48S2-R", serial: "HSH20100012", site: "NYC-DC1", network_os: "eos" },
-        MockDevice { hostname: "agg-rtr-01", ip: "10.0.2.1", vendor: "cisco_ios", model: "ISR4451", serial: "FGL2404AA4B", site: "SYD-DC3", network_os: "ios" },
-        MockDevice { hostname: "agg-rtr-02", ip: "10.0.2.2", vendor: "cisco_ios", model: "ISR4451", serial: "FGL2404AA4C", site: "SYD-DC3", network_os: "ios" },
-        MockDevice { hostname: "pe-rtr-01", ip: "10.0.3.1", vendor: "nokia_sros", model: "7210 SAS-T", serial: "NS21070003", site: "LON-DC2", network_os: "sros" },
-        MockDevice { hostname: "pe-rtr-02", ip: "10.0.3.2", vendor: "nokia_sros", model: "7210 SAS-T", serial: "NS21070004", site: "SYD-DC3", network_os: "sros" },
-        MockDevice { hostname: "border-sw-01", ip: "10.1.2.1", vendor: "arista_eos", model: "DCS-7280CR3-32P4", serial: "HSH22010013", site: "NYC-DC1", network_os: "eos" },
-        MockDevice { hostname: "dist-rtr-01", ip: "10.0.4.1", vendor: "cisco_ios", model: "Catalyst 9300", serial: "FCW2319Y0J2", site: "SYD-DC3", network_os: "ios" },
-        MockDevice { hostname: "wan-rtr-01", ip: "10.0.5.1", vendor: "nokia_sros", model: "7705 SAR-8", serial: "NS20100005", site: "LON-DC2", network_os: "sros" },
+        MockDevice {
+            hostname: "core-rtr-01",
+            ip: "10.0.0.1",
+            vendor: "cisco_ios",
+            model: "ASR1001-X",
+            serial: "FXS2208Q1GD",
+            site: "NYC-DC1",
+            network_os: "ios",
+        },
+        MockDevice {
+            hostname: "core-rtr-02",
+            ip: "10.0.0.2",
+            vendor: "cisco_ios",
+            model: "ASR1001-X",
+            serial: "FXS2208Q1GE",
+            site: "NYC-DC1",
+            network_os: "ios",
+        },
+        MockDevice {
+            hostname: "edge-rtr-01",
+            ip: "10.0.1.1",
+            vendor: "nokia_sros",
+            model: "7750 SR-12",
+            serial: "NS22010001",
+            site: "NYC-DC1",
+            network_os: "sros",
+        },
+        MockDevice {
+            hostname: "edge-rtr-02",
+            ip: "10.0.1.2",
+            vendor: "nokia_sros",
+            model: "7750 SR-12",
+            serial: "NS22010002",
+            site: "LON-DC2",
+            network_os: "sros",
+        },
+        MockDevice {
+            hostname: "spine-sw-01",
+            ip: "10.1.0.1",
+            vendor: "arista_eos",
+            model: "DCS-7050CX3-32S",
+            serial: "HSH21270001",
+            site: "NYC-DC1",
+            network_os: "eos",
+        },
+        MockDevice {
+            hostname: "spine-sw-02",
+            ip: "10.1.0.2",
+            vendor: "arista_eos",
+            model: "DCS-7050CX3-32S",
+            serial: "HSH21270002",
+            site: "LON-DC2",
+            network_os: "eos",
+        },
+        MockDevice {
+            hostname: "leaf-sw-01",
+            ip: "10.1.1.1",
+            vendor: "arista_eos",
+            model: "DCS-7020R-48S2-R",
+            serial: "HSH20100011",
+            site: "NYC-DC1",
+            network_os: "eos",
+        },
+        MockDevice {
+            hostname: "leaf-sw-02",
+            ip: "10.1.1.2",
+            vendor: "arista_eos",
+            model: "DCS-7020R-48S2-R",
+            serial: "HSH20100012",
+            site: "NYC-DC1",
+            network_os: "eos",
+        },
+        MockDevice {
+            hostname: "agg-rtr-01",
+            ip: "10.0.2.1",
+            vendor: "cisco_ios",
+            model: "ISR4451",
+            serial: "FGL2404AA4B",
+            site: "SYD-DC3",
+            network_os: "ios",
+        },
+        MockDevice {
+            hostname: "agg-rtr-02",
+            ip: "10.0.2.2",
+            vendor: "cisco_ios",
+            model: "ISR4451",
+            serial: "FGL2404AA4C",
+            site: "SYD-DC3",
+            network_os: "ios",
+        },
+        MockDevice {
+            hostname: "pe-rtr-01",
+            ip: "10.0.3.1",
+            vendor: "nokia_sros",
+            model: "7210 SAS-T",
+            serial: "NS21070003",
+            site: "LON-DC2",
+            network_os: "sros",
+        },
+        MockDevice {
+            hostname: "pe-rtr-02",
+            ip: "10.0.3.2",
+            vendor: "nokia_sros",
+            model: "7210 SAS-T",
+            serial: "NS21070004",
+            site: "SYD-DC3",
+            network_os: "sros",
+        },
+        MockDevice {
+            hostname: "border-sw-01",
+            ip: "10.1.2.1",
+            vendor: "arista_eos",
+            model: "DCS-7280CR3-32P4",
+            serial: "HSH22010013",
+            site: "NYC-DC1",
+            network_os: "eos",
+        },
+        MockDevice {
+            hostname: "dist-rtr-01",
+            ip: "10.0.4.1",
+            vendor: "cisco_ios",
+            model: "Catalyst 9300",
+            serial: "FCW2319Y0J2",
+            site: "SYD-DC3",
+            network_os: "ios",
+        },
+        MockDevice {
+            hostname: "wan-rtr-01",
+            ip: "10.0.5.1",
+            vendor: "nokia_sros",
+            model: "7705 SAR-8",
+            serial: "NS20100005",
+            site: "LON-DC2",
+            network_os: "sros",
+        },
     ]
 }
 
@@ -2620,9 +2720,7 @@ fn mock_ansible_inventory(format: &str, filter: &Option<InventoryFilter>) -> Ans
     }
 }
 
-fn build_inventory_yaml(
-    groups: &std::collections::HashMap<&str, Vec<&MockDevice>>,
-) -> String {
+fn build_inventory_yaml(groups: &std::collections::HashMap<&str, Vec<&MockDevice>>) -> String {
     let mut out = String::from("all:\n  children:\n");
     let mut sorted_groups: Vec<_> = groups.iter().collect();
     sorted_groups.sort_by_key(|(k, _)| *k);
@@ -2643,9 +2741,7 @@ fn build_inventory_yaml(
     out
 }
 
-fn build_inventory_json(
-    groups: &std::collections::HashMap<&str, Vec<&MockDevice>>,
-) -> String {
+fn build_inventory_json(groups: &std::collections::HashMap<&str, Vec<&MockDevice>>) -> String {
     use serde_json::{json, Map, Value};
 
     let mut children = Map::new();
@@ -2708,8 +2804,7 @@ fn mock_playbook_templates() -> Vec<PlaybookTemplate> {
             id: "health-check".into(),
             name: "Health Check".into(),
             description:
-                "Run health checks across selected devices — CPU, memory, interface errors."
-                    .into(),
+                "Run health checks across selected devices — CPU, memory, interface errors.".into(),
             variables: vec![
                 TemplateVariable {
                     name: "cpu_threshold".into(),
@@ -2728,8 +2823,8 @@ fn mock_playbook_templates() -> Vec<PlaybookTemplate> {
         PlaybookTemplate {
             id: "firmware-upgrade".into(),
             name: "Firmware Upgrade".into(),
-            description:
-                "Stage and activate firmware on target devices with pre/post checks.".into(),
+            description: "Stage and activate firmware on target devices with pre/post checks."
+                .into(),
             variables: vec![
                 TemplateVariable {
                     name: "firmware_image".into(),
@@ -2826,11 +2921,7 @@ fn mock_generate_playbook(
                 .map(|s| s.as_str())
                 .unwrap_or(&v.default_value);
             if !val.is_empty() {
-                vars_section.push_str(&format!(
-                    "    {}: \"{}\"\n",
-                    v.name,
-                    yaml_escape(val)
-                ));
+                vars_section.push_str(&format!("    {}: \"{}\"\n", v.name, yaml_escape(val)));
             }
         }
     }
@@ -2925,7 +3016,7 @@ pub async fn get_vlans(hostname: Option<String>) -> Result<Vec<VlanInventoryEntr
         }
     }
 
-    Ok(mock_vlan_inventory(hostname.as_deref()))
+    Err(sidecar_unavailable("VLAN inventory"))
 }
 
 /// Check VLAN consistency across selected devices.
@@ -2965,7 +3056,7 @@ pub async fn check_vlan_consistency(devices: Vec<String>) -> Result<VlanConsiste
         }
     }
 
-    Ok(mock_vlan_consistency_report(&devices))
+    Err(sidecar_unavailable("VLAN consistency report"))
 }
 
 // ---------------------------------------------------------------------------
@@ -3017,7 +3108,11 @@ fn mock_vlan_inventory(hostname: Option<&str>) -> Vec<VlanInventoryEntry> {
             state: "active".into(),
             interface_count: 32,
             trunk_count: 3,
-            trunk_interfaces: vec!["Ethernet47".into(), "Ethernet48".into(), "Port-Channel1".into()],
+            trunk_interfaces: vec![
+                "Ethernet47".into(),
+                "Ethernet48".into(),
+                "Port-Channel1".into(),
+            ],
         },
         VlanInventoryEntry {
             hostname: "leaf-sw-01".into(),
@@ -3026,7 +3121,11 @@ fn mock_vlan_inventory(hostname: Option<&str>) -> Vec<VlanInventoryEntry> {
             state: "active".into(),
             interface_count: 32,
             trunk_count: 3,
-            trunk_interfaces: vec!["Ethernet47".into(), "Ethernet48".into(), "Port-Channel1".into()],
+            trunk_interfaces: vec![
+                "Ethernet47".into(),
+                "Ethernet48".into(),
+                "Port-Channel1".into(),
+            ],
         },
         VlanInventoryEntry {
             hostname: "leaf-sw-02".into(),
@@ -3058,7 +3157,9 @@ fn mock_vlan_inventory(hostname: Option<&str>) -> Vec<VlanInventoryEntry> {
     ];
 
     if let Some(h) = hostname {
-        all.into_iter().filter(|entry| entry.hostname == h).collect()
+        all.into_iter()
+            .filter(|entry| entry.hostname == h)
+            .collect()
     } else {
         all
     }
@@ -3094,7 +3195,11 @@ fn mock_vlan_consistency_report(devices: &[String]) -> VlanConsistencyReport {
                 vlan_id: 20,
                 vlan_name: "Voice".into(),
                 status: "critical".into(),
-                devices: vec!["core-rtr-01".into(), "edge-rtr-01".into(), "leaf-sw-02".into()],
+                devices: vec![
+                    "core-rtr-01".into(),
+                    "edge-rtr-01".into(),
+                    "leaf-sw-02".into(),
+                ],
                 message: "VLAN ID 20 has mismatched names (Voice vs Voice-Phones).".into(),
             },
             VlanConsistencyIssue {
@@ -3105,5 +3210,30 @@ fn mock_vlan_consistency_report(devices: &[String]) -> VlanConsistencyReport {
                 message: "VLAN present on a subset of devices only.".into(),
             },
         ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ScanArgs;
+
+    #[test]
+    fn deep_scan_uses_supported_backend_flags() {
+        let scan = ScanArgs::subnet("192.0.2.0/24", "admin", "not-an-argument", true, 8);
+
+        assert!(scan.args.iter().any(|arg| arg == "--password"));
+        assert!(scan.args.iter().any(|arg| arg == "--concurrency"));
+        assert!(scan.args.iter().any(|arg| arg == "--deep"));
+        assert!(!scan.args.iter().any(|arg| arg == "--password-stdin"));
+        assert!(!scan.args.iter().any(|arg| arg == "--ssh-concurrency"));
+    }
+
+    #[test]
+    fn shallow_scan_uses_supported_output_flag() {
+        let scan = ScanArgs::csv("devices.csv", "admin", "not-an-argument", false, 8);
+
+        assert!(scan.args.iter().any(|arg| arg == "--output"));
+        assert!(scan.args.iter().any(|arg| arg == "--user"));
+        assert!(!scan.args.iter().any(|arg| arg == "--event-stream"));
     }
 }
