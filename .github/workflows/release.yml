@@ -28,4 +28,5 @@ jobs:
     with:
       bump: ${{ inputs.bump || '' }}
       target_version: ${{ inputs.target_version || '' }}
+      publish_npm: false
     secrets: inherit
