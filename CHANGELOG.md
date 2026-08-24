@@ -1,3 +1,7 @@
+## [0.30.2] — 2026-08-24
+
+- Initial plan (#78) (f33d2e9)
+
 ## [0.30.1] — 2026-08-24
 
 - ci(release): reconcile diverged release branches (#75) (e164ec3)
