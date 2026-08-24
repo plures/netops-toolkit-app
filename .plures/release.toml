@@ -1,0 +1,5 @@
+# Stable (even-minor) releases publish the Windows desktop installer.
+parityLaw = true
+publishPlatformInstallers = true
+platformTargets = ["windows"]
+tauriProjectPath = "."

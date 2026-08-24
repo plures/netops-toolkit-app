@@ -29,4 +29,6 @@ jobs:
       bump: ${{ inputs.bump || '' }}
       target_version: ${{ inputs.target_version || '' }}
       publish_npm: false
+      frontend_install: npm ci
+      tauri_script: npx tauri
     secrets: inherit
