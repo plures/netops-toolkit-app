@@ -1,3 +1,9 @@
+## [0.30.0] — 2026-08-24
+
+- Update release.yml to include pull-requests permission (84b2e98)
+- fix: make unavailable backend operations fail closed (#69) (bb59de7)
+- feat: connect desktop app to active bastion service (#68) (4947806)
+
 ## [0.29.0] — 2026-08-08
 
 - feat: add minimal local persistence (PluresDB) for scan history (#67) (3f18b9f)
