@@ -1,6 +1,6 @@
 ## [0.30.2] — 2026-08-24
 
-- Initial plan (#78) (f33d2e9)
+- Documented the shared release workflow's missing GitHub token that blocks Windows installer uploads (#78) (f33d2e9)
 
 ## [0.30.1] — 2026-08-24
 
