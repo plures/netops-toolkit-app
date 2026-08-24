@@ -23,6 +23,12 @@ permissions:
   packages: write
   id-token: write
 jobs:
+  # A release-preparation branch is only valid for the base commit it was
+  # generated from. When new commits land on main before that branch merges,
+  # the next release run regenerates the same version from a newer base and the
+  # reusable workflow's `git push origin HEAD:release/vX` is rejected as a
+  # non-fast-forward. Retire diverged preparation branches (and their PRs) so
+  # the release job can recreate them from the current base.
   reconcile-release-branches:
     runs-on: ubuntu-latest
     permissions:
