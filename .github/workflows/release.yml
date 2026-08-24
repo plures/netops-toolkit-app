@@ -56,10 +56,10 @@ jobs:
           fi
 
           for BRANCH in $BRANCHES; do
-            STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BRANCH}...${BASE_SHA}" --jq '.status')
+            STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE_SHA}...${BRANCH}" --jq '.status')
             case "$STATUS" in
               identical|behind)
-                echo "$BRANCH already contains $BASE_SHA; keeping it."
+                echo "$BRANCH is contained in $BASE_SHA; keeping it."
                 continue
                 ;;
             esac
