@@ -23,7 +23,51 @@ permissions:
   packages: write
   id-token: write
 jobs:
+  reconcile-release-branches:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Retire diverged release-preparation branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF_TYPE" != "branch" ]; then
+            echo "Tag build; release-preparation branches are untouched."
+            exit 0
+          fi
+
+          BRANCHES=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/branches?per_page=100" \
+            --jq '.[].name' | grep -E '^release/v[0-9]' || true)
+
+          if [ -z "$BRANCHES" ]; then
+            echo "No release-preparation branches present."
+            exit 0
+          fi
+
+          for BRANCH in $BRANCHES; do
+            STATUS=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE_SHA}...${BRANCH}" --jq '.status')
+            case "$STATUS" in
+              identical|behind)
+                echo "$BRANCH is contained in $BASE_SHA; keeping it."
+                continue
+                ;;
+            esac
+
+            echo "$BRANCH is $STATUS relative to $BASE_SHA; retiring it."
+            PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open --json number --jq '.[0].number')
+            if [ -n "$PR" ]; then
+              gh pr close "$PR" --repo "$GITHUB_REPOSITORY"
+            fi
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH}"
+          done
+
   release:
+    needs: reconcile-release-branches
     uses: plures/.github/.github/workflows/release-reusable.yml@main
     with:
       bump: ${{ inputs.bump || '' }}
