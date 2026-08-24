@@ -221,7 +221,6 @@ enum CliLine {
 
 struct ScanArgs {
     args: Vec<String>,
-    password: Option<String>,
 }
 
 impl ScanArgs {
@@ -231,21 +230,19 @@ impl ScanArgs {
             "netops.inventory.scan".into(),
             "--subnet".into(),
             subnet.to_string(),
-            "--event-stream".into(),
+            "--user".into(),
+            user.to_string(),
+            "--password".into(),
+            password.to_string(),
+            "--concurrency".into(),
+            concurrency.to_string(),
+            "--output".into(),
+            "json".into(),
         ];
         if deep {
-            args.extend([
-                "--user".into(),
-                user.to_string(),
-                "--password-stdin".into(),
-                "--ssh-concurrency".into(),
-                concurrency.to_string(),
-            ]);
+            args.push("--deep".into());
         }
-        Self {
-            args,
-            password: deep.then(|| password.to_string()),
-        }
+        Self { args }
     }
 
     fn csv(csv_path: &str, user: &str, password: &str, deep: bool, concurrency: u32) -> Self {
@@ -254,21 +251,19 @@ impl ScanArgs {
             "netops.inventory.scan".into(),
             "--csv".into(),
             csv_path.to_string(),
-            "--event-stream".into(),
+            "--user".into(),
+            user.to_string(),
+            "--password".into(),
+            password.to_string(),
+            "--concurrency".into(),
+            concurrency.to_string(),
+            "--output".into(),
+            "json".into(),
         ];
         if deep {
-            args.extend([
-                "--user".into(),
-                user.to_string(),
-                "--password-stdin".into(),
-                "--ssh-concurrency".into(),
-                concurrency.to_string(),
-            ]);
+            args.push("--deep".into());
         }
-        Self {
-            args,
-            password: deep.then(|| password.to_string()),
-        }
+        Self { args }
     }
 }
 
@@ -280,11 +275,9 @@ impl ScanArgs {
 /// and emits Tauri events.  If `cancel_rx` fires, kills the child process.
 async fn run_scan(app: AppHandle, python_args: ScanArgs, cancel_rx: oneshot::Receiver<()>) {
     let start = std::time::Instant::now();
-    let ScanArgs { args, password } = python_args;
 
     let child = Command::new(PYTHON)
-        .args(&args)
-        .stdin(std::process::Stdio::piped())
+        .args(&python_args.args)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true)
@@ -303,25 +296,6 @@ async fn run_scan(app: AppHandle, python_args: ScanArgs, cancel_rx: oneshot::Rec
             return;
         }
     };
-
-    if let Some(password) = password {
-        use tokio::io::AsyncWriteExt;
-        if let Some(mut stdin) = child.stdin.take() {
-            if let Err(e) = stdin.write_all(password.as_bytes()).await {
-                let _ = app.emit(
-                    "scan:error",
-                    ScanErrorEvent {
-                        message: format!(
-                            "Unable to provide scan credentials to the netops backend: {e}"
-                        ),
-                        ip: None,
-                    },
-                );
-                let _ = child.kill().await;
-                return;
-            }
-        }
-    }
 
     let stdout = child.stdout.take().expect("stdout must be piped");
     let mut lines = BufReader::new(stdout).lines();
@@ -3244,22 +3218,22 @@ mod tests {
     use super::ScanArgs;
 
     #[test]
-    fn deep_scan_password_uses_stdin_not_process_arguments() {
+    fn deep_scan_uses_supported_backend_flags() {
         let scan = ScanArgs::subnet("192.0.2.0/24", "admin", "not-an-argument", true, 8);
 
-        assert!(scan.args.iter().any(|arg| arg == "--password-stdin"));
-        assert!(scan.args.iter().any(|arg| arg == "--ssh-concurrency"));
-        assert!(!scan.args.iter().any(|arg| arg == "--password"));
-        assert!(!scan.args.iter().any(|arg| arg == "not-an-argument"));
-        assert_eq!(scan.password.as_deref(), Some("not-an-argument"));
+        assert!(scan.args.iter().any(|arg| arg == "--password"));
+        assert!(scan.args.iter().any(|arg| arg == "--concurrency"));
+        assert!(scan.args.iter().any(|arg| arg == "--deep"));
+        assert!(!scan.args.iter().any(|arg| arg == "--password-stdin"));
+        assert!(!scan.args.iter().any(|arg| arg == "--ssh-concurrency"));
     }
 
     #[test]
-    fn shallow_scan_does_not_supply_unused_credentials() {
+    fn shallow_scan_uses_supported_output_flag() {
         let scan = ScanArgs::csv("devices.csv", "admin", "not-an-argument", false, 8);
 
-        assert!(scan.args.iter().any(|arg| arg == "--event-stream"));
-        assert!(!scan.args.iter().any(|arg| arg == "--user"));
-        assert!(scan.password.is_none());
+        assert!(scan.args.iter().any(|arg| arg == "--output"));
+        assert!(scan.args.iter().any(|arg| arg == "--user"));
+        assert!(!scan.args.iter().any(|arg| arg == "--event-stream"));
     }
 }
