@@ -57,6 +57,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/**", "node_modules/**", ".svelte-kit/**", "build/**", "coverage/**"],
+    ignores: ["dist/**", "node_modules/**", ".svelte-kit/**", "build/**", "coverage/**", "src-tauri/target/**"],
   },
 );

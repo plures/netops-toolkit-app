@@ -4,8 +4,8 @@
 
 ### Current State
 - **Frontend**: Svelte 5 (runes) + SvelteKit (adapter-static) + design-dojo components
-- **Backend**: Tauri 2 Rust commands, currently shelling out to Python `netops-toolkit` sidecar
-- **Persistence**: localStorage only (license store, settings store), no database
+- **Backend**: Native Rust/OpenSSH bastion gateway. Python and the prior sidecar have been removed.
+- **Persistence**: Per-user native bastion profile and process log only; no database
 - **Sync**: None — no pluresDB, no hyperswarm, no multi-device
 - **Licensing**: Device-count gates per feature (free=10 devices, pro=unlimited). Per-seat NOT implemented (good). License stored in localStorage as JSON, "validated" by key prefix (`NETOPS-PRO-*`)
 - **Partitioning**: None — single implicit workspace, no concept of org, partition, or multi-tenancy
@@ -21,7 +21,7 @@
 - Service layer wraps `invoke()` (Tauri commands) — all domain services follow this
 - Svelte 5 rune stores (class with `$state`/`$derived`) — all stores follow this
 - Types in `src/lib/types/`, services in `src/lib/services/`, stores in `src/lib/stores/`
-- Rust commands in `src-tauri/src/commands.rs` (currently monolithic, will split into modules)
+- Native commands will be introduced with their real capability modules rather than a generic sidecar wrapper.
 
 ---
 
@@ -174,7 +174,7 @@ The existing `license.types.ts` and `license.svelte.ts` implement per-feature de
 5. **Add Rust `licensing` + `partitions` modules** for backend enforcement + signature verification
 
 ### Data Migration
-- No user data to migrate (all mock data currently)
+- No user data to migrate from the removed simulated features
 - localStorage license → migrated to pluresDB on first run with partition support
 - Settings → migrated from localStorage to partition-scoped pluresDB collection
 
@@ -244,7 +244,7 @@ Files created/modified:
 - `src/routes/license/+page.svelte` — Rewritten
 - `src/lib/components/AppShell.svelte` — Partition switcher added
 - `src-tauri/src/lib.rs` — Register new command modules
-- `src-tauri/src/commands.rs` — Extract licensing/vault commands to modules
+- Native licensing and vault modules — add only when their secure, persisted implementation is ready
 - `src-tauri/Cargo.toml` — Add ed25519-dalek, uuid, chrono deps
 
 ### Deleted Files
