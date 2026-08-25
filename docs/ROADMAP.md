@@ -4,14 +4,14 @@
 netops-toolkit-app is the operator console that proves the OASIS stack in the field: a local‑first, privacy‑preserving UI that orchestrates agents (Pares Agens), enforces rules (Praxis), and persists data (PluresDB). It is both a real network ops product and a showcase application for multi‑surface (GUI + TUI) experiences running on the OASIS substrate.
 
 ## Current State
-The Svelte 5 + Tauri 2 app renders a rich GUI and a TUI mode with documented screens. The Python sidecar is wired, but deep workflows (scan → persist → analyze → diff → policy enforcement) are still shallow. No open issues are currently tracked in this repo.
+The app provides one real native workflow: a local OpenSSH SOCKS5 bastion gateway. Python, Ansible, simulated results, and unimplemented device-operation screens have been removed. Future native network workflows will return only as real implementations.
 
 ## Phases
 
-### Phase 0 — Stabilize the shell (Now)
-- Harden routing, navigation, and shared view components for GUI/TUI parity.
-- Normalize data contracts between the UI and netops-toolkit sidecar.
-- Add minimal local persistence (PluresDB) for scan history and configs.
+### Phase 0 — Stabilize the bastion gateway (Now)
+- Add authenticated end-to-end test coverage against a controlled SSH target.
+- Extend OpenSSH proxy support with explicit local forwards for applications that cannot use SOCKS5.
+- Define durable, user-controlled profile and audit boundaries before adding device workflows.
 
 ### Phase 1 — OASIS‑aligned operator workflows
 - End‑to‑end scan runner: launch → live progress → results ingestion.

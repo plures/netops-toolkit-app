@@ -12,11 +12,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "lint": "eslint .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "setup-python": "node scripts/setup-python.mjs",
-    "dev:tauri": "node scripts/setup-python.mjs && npm run dev",
-    "build:tauri": "node scripts/setup-python.mjs && npm run build"
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
