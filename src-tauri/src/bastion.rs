@@ -10,7 +10,10 @@ use std::{
     net::TcpListener,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -18,12 +21,16 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
-const PROFILE_FILE: &str = "bastion-profile.json";
+const PROFILES_FILE: &str = "bastion-profiles.json";
+const LEGACY_PROFILE_FILE: &str = "bastion-profile.json";
 const LOG_FILE: &str = "bastion-ssh.log";
+static PROFILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BastionProfile {
+    #[serde(default)]
+    pub id: String,
     pub name: String,
     pub host: String,
     pub port: u16,
@@ -37,6 +44,7 @@ pub struct BastionProfile {
 #[derive(Debug, Default)]
 struct BastionRuntime {
     process: Option<Child>,
+    active_profile: Option<BastionProfile>,
     started_at: Option<u64>,
     last_exit_code: Option<i32>,
 }
@@ -59,8 +67,8 @@ pub struct BastionStatus {
 }
 
 #[tauri::command]
-pub fn get_bastion_profile(app: AppHandle) -> Result<Option<BastionProfile>, String> {
-    load_profile(&app)
+pub fn get_bastion_profiles(app: AppHandle) -> Result<Vec<BastionProfile>, String> {
+    load_profiles(&app)
 }
 
 #[tauri::command]
@@ -69,14 +77,44 @@ pub fn save_bastion_profile(
     mut profile: BastionProfile,
 ) -> Result<BastionProfile, String> {
     validate_profile(&mut profile)?;
-    let path = profile_path(&app)?;
-    fs::write(
-        path,
-        serde_json::to_vec_pretty(&profile)
-            .map_err(|error| format!("Could not encode bastion profile: {error}"))?,
-    )
-    .map_err(|error| format!("Could not save bastion profile: {error}"))?;
+    if profile.id.is_empty() {
+        profile.id = new_profile_id()?;
+    }
+    let mut profiles = load_profiles(&app)?;
+    upsert_profile(&mut profiles, profile.clone());
+    save_profiles(&app, &profiles)?;
     Ok(profile)
+}
+
+#[tauri::command]
+pub fn delete_bastion_profile(
+    app: AppHandle,
+    state: State<'_, BastionState>,
+    profile_id: String,
+) -> Result<(), String> {
+    let profile_id = profile_id.trim();
+    if profile_id.is_empty() {
+        return Err("A bastion profile ID is required.".to_string());
+    }
+    let runtime = state
+        .runtime
+        .lock()
+        .map_err(|_| "Bastion process state is unavailable")?;
+    if runtime
+        .active_profile
+        .as_ref()
+        .is_some_and(|profile| profile.id == profile_id)
+    {
+        return Err("Disconnect the active bastion before deleting its profile.".to_string());
+    }
+
+    let mut profiles = load_profiles(&app)?;
+    let original_count = profiles.len();
+    profiles.retain(|profile| profile.id != profile_id);
+    if profiles.len() == original_count {
+        return Err("The requested bastion profile no longer exists.".to_string());
+    }
+    save_profiles(&app, &profiles)
 }
 
 #[tauri::command]
@@ -84,25 +122,22 @@ pub fn get_bastion_status(
     app: AppHandle,
     state: State<'_, BastionState>,
 ) -> Result<BastionStatus, String> {
-    let profile = load_profile(&app)?;
-    status_from_runtime(&app, &state, profile)
+    status_from_runtime(&app, &state)
 }
 
 #[tauri::command]
 pub fn connect_bastion(
     app: AppHandle,
     state: State<'_, BastionState>,
+    profile_id: String,
 ) -> Result<BastionStatus, String> {
-    let profile = load_profile(&app)?.ok_or(
-        "No bastion profile is saved. Save a host, username, and SOCKS port before connecting.",
-    )?;
-    validate_connect_inputs(&profile)?;
-    ensure_socks_port_is_available(profile.socks_port)?;
-
     let mut runtime = state
         .runtime
         .lock()
         .map_err(|_| "Bastion process state is unavailable")?;
+    let profile = find_profile(&load_profiles(&app)?, profile_id.trim())?.clone();
+    validate_connect_inputs(&profile)?;
+    ensure_socks_port_is_available(profile.socks_port)?;
     let previous_status = runtime
         .process
         .as_mut()
@@ -120,6 +155,7 @@ pub fn connect_bastion(
             runtime.last_exit_code = status.code();
             runtime.started_at = None;
             runtime.process = None;
+            runtime.active_profile = None;
         }
         None => {}
     }
@@ -151,7 +187,9 @@ pub fn connect_bastion(
         runtime.last_exit_code = exit_status.code();
         return Err(format!(
             "OpenSSH exited before the SOCKS proxy started (exit code {}). See {}.",
-            exit_status.code().map_or_else(|| "unknown".to_string(), |code| code.to_string()),
+            exit_status
+                .code()
+                .map_or_else(|| "unknown".to_string(), |code| code.to_string()),
             log_path.display()
         ));
     }
@@ -159,7 +197,8 @@ pub fn connect_bastion(
     runtime.started_at = Some(unix_time_ms()?);
     runtime.last_exit_code = None;
     runtime.process = Some(child);
-    status_from_locked_runtime(&log_path, &mut runtime, Some(profile))
+    runtime.active_profile = Some(profile);
+    status_from_locked_runtime(&log_path, &mut runtime)
 }
 
 #[tauri::command]
@@ -167,7 +206,6 @@ pub fn disconnect_bastion(
     app: AppHandle,
     state: State<'_, BastionState>,
 ) -> Result<BastionStatus, String> {
-    let profile = load_profile(&app)?;
     let log_path = log_path(&app)?;
     let mut runtime = state
         .runtime
@@ -184,26 +222,22 @@ pub fn disconnect_bastion(
         runtime.last_exit_code = status.code();
     }
     runtime.started_at = None;
-    status_from_locked_runtime(&log_path, &mut runtime, profile)
+    runtime.active_profile = None;
+    status_from_locked_runtime(&log_path, &mut runtime)
 }
 
-fn status_from_runtime(
-    app: &AppHandle,
-    state: &BastionState,
-    profile: Option<BastionProfile>,
-) -> Result<BastionStatus, String> {
+fn status_from_runtime(app: &AppHandle, state: &BastionState) -> Result<BastionStatus, String> {
     let log_path = log_path(app)?;
     let mut runtime = state
         .runtime
         .lock()
         .map_err(|_| "Bastion process state is unavailable")?;
-    status_from_locked_runtime(&log_path, &mut runtime, profile)
+    status_from_locked_runtime(&log_path, &mut runtime)
 }
 
 fn status_from_locked_runtime(
     log_path: &Path,
     runtime: &mut BastionRuntime,
-    profile: Option<BastionProfile>,
 ) -> Result<BastionStatus, String> {
     let mut pid = None;
     let mut process_status = "stopped".to_string();
@@ -223,15 +257,17 @@ fn status_from_locked_runtime(
             runtime.last_exit_code = exit_status.code();
             runtime.started_at = None;
             runtime.process = None;
+            runtime.active_profile = None;
         }
         None => {}
     }
 
-    let socks_endpoint = profile
+    let socks_endpoint = runtime
+        .active_profile
         .as_ref()
         .map(|current| format!("socks5://127.0.0.1:{}", current.socks_port));
     Ok(BastionStatus {
-        profile,
+        profile: runtime.active_profile.clone(),
         process_status,
         pid,
         socks_endpoint,
@@ -241,20 +277,56 @@ fn status_from_locked_runtime(
     })
 }
 
-fn load_profile(app: &AppHandle) -> Result<Option<BastionProfile>, String> {
-    let path = profile_path(app)?;
-    if !path.exists() {
-        return Ok(None);
-    }
-    let contents =
-        fs::read_to_string(path).map_err(|error| format!("Could not read bastion profile: {error}"))?;
-    let profile = serde_json::from_str(&contents)
-        .map_err(|error| format!("Saved bastion profile is invalid: {error}"))?;
-    Ok(Some(profile))
+fn load_profiles(app: &AppHandle) -> Result<Vec<BastionProfile>, String> {
+    let path = profiles_path(app)?;
+    let legacy_path = legacy_profile_path(app)?;
+    load_profiles_from_paths(&path, &legacy_path)
 }
 
-fn profile_path(app: &AppHandle) -> Result<PathBuf, String> {
-    app_config_dir(app).map(|directory| directory.join(PROFILE_FILE))
+fn load_profiles_from_paths(
+    profiles_path: &Path,
+    legacy_profile_path: &Path,
+) -> Result<Vec<BastionProfile>, String> {
+    if profiles_path.exists() {
+        let contents = fs::read_to_string(profiles_path)
+            .map_err(|error| format!("Could not read bastion profiles: {error}"))?;
+        return serde_json::from_str(&contents)
+            .map_err(|error| format!("Saved bastion profiles are invalid: {error}"));
+    }
+
+    if !legacy_profile_path.exists() {
+        return Ok(Vec::new());
+    }
+    let contents = fs::read_to_string(legacy_profile_path)
+        .map_err(|error| format!("Could not read the legacy bastion profile: {error}"))?;
+    let mut profile: BastionProfile = serde_json::from_str(&contents)
+        .map_err(|error| format!("Saved legacy bastion profile is invalid: {error}"))?;
+    if profile.id.is_empty() {
+        profile.id = "legacy-default".to_string();
+    }
+    Ok(vec![profile])
+}
+
+fn save_profiles(app: &AppHandle, profiles: &[BastionProfile]) -> Result<(), String> {
+    let path = profiles_path(app)?;
+    save_profiles_to_path(&path, profiles)
+}
+
+fn save_profiles_to_path(path: &Path, profiles: &[BastionProfile]) -> Result<(), String> {
+    fs::write(
+        path,
+        serde_json::to_vec_pretty(profiles)
+            .map_err(|error| format!("Could not encode bastion profiles: {error}"))?,
+    )
+    .map_err(|error| format!("Could not save bastion profiles: {error}"))
+}
+
+fn profiles_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app_config_dir(app).map(|directory| directory.join(PROFILES_FILE))
+}
+
+fn legacy_profile_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app_config_dir(app).map(|directory| directory.join(LEGACY_PROFILE_FILE))
 }
 
 fn log_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -272,6 +344,7 @@ fn app_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn validate_profile(profile: &mut BastionProfile) -> Result<(), String> {
+    profile.id = profile.id.trim().to_string();
     profile.name = profile.name.trim().to_string();
     profile.host = profile.host.trim().to_string();
     profile.username = profile.username.trim().to_string();
@@ -284,6 +357,38 @@ fn validate_profile(profile: &mut BastionProfile) -> Result<(), String> {
     Ok(())
 }
 
+fn new_profile_id() -> Result<String, String> {
+    Ok(format!(
+        "bastion-{}-{}",
+        unix_time_ms()?,
+        PROFILE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
+fn upsert_profile(profiles: &mut Vec<BastionProfile>, profile: BastionProfile) {
+    if let Some(existing) = profiles
+        .iter_mut()
+        .find(|existing| existing.id == profile.id)
+    {
+        *existing = profile;
+    } else {
+        profiles.push(profile);
+    }
+}
+
+fn find_profile<'a>(
+    profiles: &'a [BastionProfile],
+    profile_id: &str,
+) -> Result<&'a BastionProfile, String> {
+    if profile_id.is_empty() {
+        return Err("Select a saved bastion profile before connecting.".to_string());
+    }
+    profiles
+        .iter()
+        .find(|profile| profile.id == profile_id)
+        .ok_or_else(|| "The selected bastion profile no longer exists.".to_string())
+}
+
 fn validate_connect_inputs(profile: &BastionProfile) -> Result<(), String> {
     if let Some(identity_file) = &profile.identity_file {
         if !identity_file.trim().is_empty() && !Path::new(identity_file).is_file() {
@@ -292,7 +397,9 @@ fn validate_connect_inputs(profile: &BastionProfile) -> Result<(), String> {
     }
     if let Some(known_hosts_file) = &profile.known_hosts_file {
         if !known_hosts_file.trim().is_empty() && !Path::new(known_hosts_file).is_file() {
-            return Err(format!("Known-hosts file does not exist: {known_hosts_file}"));
+            return Err(format!(
+                "Known-hosts file does not exist: {known_hosts_file}"
+            ));
         }
     }
     Ok(())
@@ -303,7 +410,9 @@ fn validate_token(label: &str, value: &str, reject_leading_dash: bool) -> Result
         return Err(format!("{label} is required."));
     }
     if value.chars().any(char::is_whitespace) || value.chars().any(char::is_control) {
-        return Err(format!("{label} cannot contain whitespace or control characters."));
+        return Err(format!(
+            "{label} cannot contain whitespace or control characters."
+        ));
     }
     if reject_leading_dash && value.starts_with('-') {
         return Err(format!("{label} cannot start with a dash."));
@@ -327,7 +436,9 @@ fn resolve_ssh_executable(profile: &BastionProfile) -> Result<PathBuf, String> {
         if path.is_file() {
             return Ok(path);
         }
-        return Err(format!("Configured OpenSSH executable does not exist: {configured_path}"));
+        return Err(format!(
+            "Configured OpenSSH executable does not exist: {configured_path}"
+        ));
     }
 
     #[cfg(target_os = "windows")]
@@ -400,10 +511,16 @@ fn unix_time_ms() -> Result<u64, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ssh_arguments, validate_profile, BastionProfile};
+    use std::{fs, time::SystemTime};
+
+    use super::{
+        find_profile, load_profiles_from_paths, save_profiles_to_path, ssh_arguments,
+        upsert_profile, validate_profile, BastionProfile, LEGACY_PROFILE_FILE, PROFILES_FILE,
+    };
 
     fn profile() -> BastionProfile {
         BastionProfile {
+            id: "primary".to_string(),
             name: "Primary".to_string(),
             host: "bastion.example.com".to_string(),
             port: 22,
@@ -418,7 +535,9 @@ mod tests {
     #[test]
     fn creates_a_strict_dynamic_forward_command() {
         let arguments = ssh_arguments(&profile());
-        assert!(arguments.windows(2).any(|pair| pair == ["-D", "127.0.0.1:1080"]));
+        assert!(arguments
+            .windows(2)
+            .any(|pair| pair == ["-D", "127.0.0.1:1080"]));
         assert!(arguments
             .windows(2)
             .any(|pair| pair == ["-o", "StrictHostKeyChecking=yes"]));
@@ -430,5 +549,62 @@ mod tests {
         let mut invalid = profile();
         invalid.host = "-oProxyCommand=bad".to_string();
         assert!(validate_profile(&mut invalid).is_err());
+    }
+
+    #[test]
+    fn upserts_and_selects_profiles_by_stable_id() {
+        let mut profiles = vec![profile()];
+        let mut replacement = profile();
+        replacement.name = "Primary replacement".to_string();
+        upsert_profile(&mut profiles, replacement);
+
+        let mut secondary = profile();
+        secondary.id = "secondary".to_string();
+        secondary.name = "Secondary".to_string();
+        upsert_profile(&mut profiles, secondary);
+
+        assert_eq!(profiles.len(), 2);
+        assert_eq!(
+            find_profile(&profiles, "primary").unwrap().name,
+            "Primary replacement"
+        );
+        assert_eq!(
+            find_profile(&profiles, "secondary").unwrap().name,
+            "Secondary"
+        );
+    }
+
+    #[test]
+    fn migrates_a_legacy_profile_when_saving_the_new_collection() {
+        let directory = std::env::temp_dir().join(format!(
+            "netops-toolkit-bastion-test-{}",
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let legacy_path = directory.join(LEGACY_PROFILE_FILE);
+        let profiles_path = directory.join(PROFILES_FILE);
+        let mut legacy_profile = profile();
+        legacy_profile.id.clear();
+        fs::write(&legacy_path, serde_json::to_vec(&legacy_profile).unwrap()).unwrap();
+
+        let mut profiles = load_profiles_from_paths(&profiles_path, &legacy_path).unwrap();
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].id, "legacy-default");
+
+        let mut additional_profile = profile();
+        additional_profile.id = "secondary".to_string();
+        upsert_profile(&mut profiles, additional_profile);
+        save_profiles_to_path(&profiles_path, &profiles).unwrap();
+
+        let saved_profiles: Vec<BastionProfile> =
+            serde_json::from_slice(&fs::read(&profiles_path).unwrap()).unwrap();
+        assert_eq!(saved_profiles.len(), 2);
+        assert_eq!(saved_profiles[0].id, "legacy-default");
+        assert_eq!(saved_profiles[1].id, "secondary");
+
+        fs::remove_dir_all(directory).unwrap();
     }
 }

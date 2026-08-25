@@ -1,21 +1,23 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
-	import { Badge, Button, Input, StatusBar, StatusBarItem, StatusBarSpacer } from '@plures/design-dojo';
+	import { Badge, Button, Input, Select, StatusBar, StatusBarItem, StatusBarSpacer } from '@plures/design-dojo';
 	import { onMount } from 'svelte';
 
-	type BastionProfile = { name: string; host: string; port: number; username: string; socksPort: number; identityFile: string | null; knownHostsFile: string | null; sshExecutable: string | null };
-	type BastionForm = { name: string; host: string; port: string; username: string; socksPort: string; identityFile: string; knownHostsFile: string; sshExecutable: string };
+	type BastionProfile = { id: string; name: string; host: string; port: number; username: string; socksPort: number; identityFile: string | null; knownHostsFile: string | null; sshExecutable: string | null };
+	type BastionForm = { id: string; name: string; host: string; port: string; username: string; socksPort: string; identityFile: string; knownHostsFile: string; sshExecutable: string };
 	type BastionStatus = { profile: BastionProfile | null; processStatus: 'running' | 'stopped'; pid: number | null; socksEndpoint: string | null; startedAt: number | null; lastExitCode: number | null; logPath: string | null };
 
-	const emptyProfile = (): BastionForm => ({ name: '', host: '', port: '22', username: '', socksPort: '1080', identityFile: '', knownHostsFile: '', sshExecutable: '' });
+	const emptyProfile = (): BastionForm => ({ id: '', name: '', host: '', port: '22', username: '', socksPort: '1080', identityFile: '', knownHostsFile: '', sshExecutable: '' });
 	const toForm = (profile: BastionProfile): BastionForm => ({ ...profile, port: String(profile.port), socksPort: String(profile.socksPort), identityFile: profile.identityFile ?? '', knownHostsFile: profile.knownHostsFile ?? '', sshExecutable: profile.sshExecutable ?? '' });
 	const toProfile = (profile: BastionForm): BastionProfile => ({ ...profile, port: Number(profile.port), socksPort: Number(profile.socksPort), identityFile: normalized(profile.identityFile), knownHostsFile: normalized(profile.knownHostsFile), sshExecutable: normalized(profile.sshExecutable) });
+	let profiles = $state<BastionProfile[]>([]);
 	let profile = $state<BastionForm>(emptyProfile());
 	let status = $state<BastionStatus | null>(null);
 	let loading = $state(true);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let notice = $state<string | null>(null);
+	let profileOptions = $derived(profiles.map((savedProfile) => ({ value: savedProfile.id, label: `${savedProfile.name} — ${savedProfile.username}@${savedProfile.host}` })));
 	const normalized = (value: string) => value.trim() || null;
 	const running = () => status?.processStatus === 'running';
 	const statusVariant = () => (running() ? 'success' : 'muted') as 'success' | 'muted';
@@ -23,8 +25,14 @@
 	async function refresh() {
 		error = null;
 		try {
-			const [savedProfile, currentStatus] = await Promise.all([invoke<BastionProfile | null>('get_bastion_profile'), invoke<BastionStatus>('get_bastion_status')]);
-			if (savedProfile) profile = toForm(savedProfile);
+			const [savedProfiles, currentStatus] = await Promise.all([invoke<BastionProfile[]>('get_bastion_profiles'), invoke<BastionStatus>('get_bastion_status')]);
+			profiles = savedProfiles;
+			if (profile.id) {
+				const selected = savedProfiles.find((candidate) => candidate.id === profile.id);
+				if (selected) profile = toForm(selected);
+			} else if (savedProfiles[0]) {
+				profile = toForm(savedProfiles[0]);
+			}
 			status = currentStatus;
 		} catch (caught) { error = String(caught); } finally { loading = false; }
 	}
@@ -41,7 +49,8 @@
 		busy = true; error = null; notice = null;
 		try {
 			profile = toForm(await invoke<BastionProfile>('save_bastion_profile', { profile: toProfile(profile) }));
-			status = await invoke<BastionStatus>('connect_bastion');
+			await refresh();
+			status = await invoke<BastionStatus>('connect_bastion', { profileId: profile.id });
 			notice = `OpenSSH is running locally${status.pid ? ` (PID ${status.pid})` : ''}.`;
 		} catch (caught) { error = String(caught); } finally { busy = false; }
 	}
@@ -51,6 +60,28 @@
 		try { status = await invoke<BastionStatus>('disconnect_bastion'); notice = 'The local OpenSSH process was stopped.'; } catch (caught) { error = String(caught); } finally { busy = false; }
 	}
 
+	function selectProfile(profileId: string) {
+		const selected = profiles.find((candidate) => candidate.id === profileId);
+		if (selected) profile = toForm(selected);
+	}
+
+	function createProfile() {
+		profile = emptyProfile();
+		notice = 'Enter a name and connection details, then save the new profile.';
+		error = null;
+	}
+
+	async function deleteProfile() {
+		if (!profile.id) return;
+		busy = true; error = null; notice = null;
+		try {
+			await invoke('delete_bastion_profile', { profileId: profile.id });
+			profile = emptyProfile();
+			await refresh();
+			notice = 'Bastion profile deleted.';
+		} catch (caught) { error = String(caught); } finally { busy = false; }
+	}
+
 	onMount(refresh);
 </script>
 
@@ -58,13 +89,17 @@
 
 <section class="workspace" aria-busy={loading}>
 	<div class="hero">
-		<div><p class="eyebrow">WORKSTATION ACCESS</p><h1>Bastion gateway</h1><p class="lede">Run a local, authenticated SOCKS proxy through the bastion you select.</p></div>
+		<div><p class="eyebrow">WORKSTATION ACCESS</p><h1>Bastion gateway</h1><p class="lede">Save named bastions and run a local, authenticated SOCKS proxy through the one you select.</p></div>
 		<Badge variant={statusVariant()} pill>{running() ? 'OpenSSH running' : 'Not running'}</Badge>
 	</div>
 
 	<div class="grid">
 		<form class="panel" onsubmit={(event) => { event.preventDefault(); void save(); }}>
 			<div class="panel-heading"><div><h2>Connection profile</h2><p>Saved locally for repeat use. Credentials are never stored here.</p></div><Badge variant="outline">SSH</Badge></div>
+			<div class="profile-picker">
+				<Select class="profile-select" label="Saved profile" bind:value={profile.id} options={profileOptions} placeholder="No saved profiles" disabled={busy || profiles.length === 0} onchange={selectProfile} />
+				<div class="profile-actions"><Button variant="ghost" size="sm" disabled={busy} onclick={(event) => { event.preventDefault(); createProfile(); }}>New profile</Button><Button variant="ghost" size="sm" disabled={busy || !profile.id || running()} onclick={(event) => { event.preventDefault(); void deleteProfile(); }}>Delete profile</Button></div>
+			</div>
 			<div class="fields">
 				<Input label="Profile name" bind:value={profile.name} placeholder="Primary bastion" disabled={busy} />
 				<Input label="Bastion host" bind:value={profile.host} placeholder="bastion.example.com" disabled={busy} />
@@ -103,6 +138,9 @@
 	.lede, .panel-heading p, .hint, .log-path { color: var(--color-text-muted, #8b949e); font-size: 0.9rem; }
 	.grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr); }
 	.panel, .security-note { background: color-mix(in srgb, var(--surface-1, #161b22) 92%, transparent); border: 1px solid var(--color-border, #30363d); border-radius: 0.85rem; padding: 1.25rem; }
+	.profile-picker { align-items: end; border-bottom: 1px solid var(--color-border, #30363d); display: grid; gap: 0.5rem 0.75rem; grid-template-columns: minmax(0, 1fr) auto; margin-top: 1.25rem; padding-bottom: 1rem; }
+	.profile-picker :global(.profile-select) { min-width: 0; }
+	.profile-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 	.fields { display: grid; gap: 0.85rem; margin-top: 1.25rem; }
 	.two-up { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.actions { align-items: center; margin-top: 1.25rem; }
@@ -118,5 +156,5 @@
 	.security-note { border-left: 3px solid var(--color-accent, #7c9cff); }
 	.security-note p { color: var(--color-text-muted, #8b949e); margin-bottom: 0; }
 	@media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .hero { flex-direction: column; } }
-	@media (max-width: 460px) { .two-up { flex-direction: column; } }
+	@media (max-width: 460px) { .two-up, .profile-picker { grid-template-columns: 1fr; } .profile-actions { grid-column: auto; } }
 </style>

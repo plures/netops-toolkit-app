@@ -8,8 +8,9 @@ pub fn run() {
     tauri::Builder::default()
         .manage(bastion::BastionState::default())
         .invoke_handler(tauri::generate_handler![
-            bastion::get_bastion_profile,
+            bastion::get_bastion_profiles,
             bastion::save_bastion_profile,
+            bastion::delete_bastion_profile,
             bastion::get_bastion_status,
             bastion::connect_bastion,
             bastion::disconnect_bastion,
