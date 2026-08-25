@@ -279,18 +279,25 @@ fn status_from_locked_runtime(
 
 fn load_profiles(app: &AppHandle) -> Result<Vec<BastionProfile>, String> {
     let path = profiles_path(app)?;
-    if path.exists() {
-        let contents = fs::read_to_string(path)
+    let legacy_path = legacy_profile_path(app)?;
+    load_profiles_from_paths(&path, &legacy_path)
+}
+
+fn load_profiles_from_paths(
+    profiles_path: &Path,
+    legacy_profile_path: &Path,
+) -> Result<Vec<BastionProfile>, String> {
+    if profiles_path.exists() {
+        let contents = fs::read_to_string(profiles_path)
             .map_err(|error| format!("Could not read bastion profiles: {error}"))?;
         return serde_json::from_str(&contents)
             .map_err(|error| format!("Saved bastion profiles are invalid: {error}"));
     }
 
-    let legacy_path = legacy_profile_path(app)?;
-    if !legacy_path.exists() {
+    if !legacy_profile_path.exists() {
         return Ok(Vec::new());
     }
-    let contents = fs::read_to_string(legacy_path)
+    let contents = fs::read_to_string(legacy_profile_path)
         .map_err(|error| format!("Could not read the legacy bastion profile: {error}"))?;
     let mut profile: BastionProfile = serde_json::from_str(&contents)
         .map_err(|error| format!("Saved legacy bastion profile is invalid: {error}"))?;
@@ -302,6 +309,10 @@ fn load_profiles(app: &AppHandle) -> Result<Vec<BastionProfile>, String> {
 
 fn save_profiles(app: &AppHandle, profiles: &[BastionProfile]) -> Result<(), String> {
     let path = profiles_path(app)?;
+    save_profiles_to_path(&path, profiles)
+}
+
+fn save_profiles_to_path(path: &Path, profiles: &[BastionProfile]) -> Result<(), String> {
     fs::write(
         path,
         serde_json::to_vec_pretty(profiles)
@@ -500,7 +511,12 @@ fn unix_time_ms() -> Result<u64, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_profile, ssh_arguments, upsert_profile, validate_profile, BastionProfile};
+    use std::{fs, time::SystemTime};
+
+    use super::{
+        find_profile, load_profiles_from_paths, save_profiles_to_path, ssh_arguments,
+        upsert_profile, validate_profile, BastionProfile, LEGACY_PROFILE_FILE, PROFILES_FILE,
+    };
 
     fn profile() -> BastionProfile {
         BastionProfile {
@@ -556,5 +572,39 @@ mod tests {
             find_profile(&profiles, "secondary").unwrap().name,
             "Secondary"
         );
+    }
+
+    #[test]
+    fn migrates_a_legacy_profile_when_saving_the_new_collection() {
+        let directory = std::env::temp_dir().join(format!(
+            "netops-toolkit-bastion-test-{}",
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let legacy_path = directory.join(LEGACY_PROFILE_FILE);
+        let profiles_path = directory.join(PROFILES_FILE);
+        let mut legacy_profile = profile();
+        legacy_profile.id.clear();
+        fs::write(&legacy_path, serde_json::to_vec(&legacy_profile).unwrap()).unwrap();
+
+        let mut profiles = load_profiles_from_paths(&profiles_path, &legacy_path).unwrap();
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].id, "legacy-default");
+
+        let mut additional_profile = profile();
+        additional_profile.id = "secondary".to_string();
+        upsert_profile(&mut profiles, additional_profile);
+        save_profiles_to_path(&profiles_path, &profiles).unwrap();
+
+        let saved_profiles: Vec<BastionProfile> =
+            serde_json::from_slice(&fs::read(&profiles_path).unwrap()).unwrap();
+        assert_eq!(saved_profiles.len(), 2);
+        assert_eq!(saved_profiles[0].id, "legacy-default");
+        assert_eq!(saved_profiles[1].id, "secondary");
+
+        fs::remove_dir_all(directory).unwrap();
     }
 }

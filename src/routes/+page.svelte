@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
-	import { Badge, Button, Input, StatusBar, StatusBarItem, StatusBarSpacer } from '@plures/design-dojo';
+	import { Badge, Button, Input, Select, StatusBar, StatusBarItem, StatusBarSpacer } from '@plures/design-dojo';
 	import { onMount } from 'svelte';
 
 	type BastionProfile = { id: string; name: string; host: string; port: number; username: string; socksPort: number; identityFile: string | null; knownHostsFile: string | null; sshExecutable: string | null };
@@ -17,6 +17,7 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let notice = $state<string | null>(null);
+	let profileOptions = $derived(profiles.map((savedProfile) => ({ value: savedProfile.id, label: `${savedProfile.name} — ${savedProfile.username}@${savedProfile.host}` })));
 	const normalized = (value: string) => value.trim() || null;
 	const running = () => status?.processStatus === 'running';
 	const statusVariant = () => (running() ? 'success' : 'muted') as 'success' | 'muted';
@@ -48,6 +49,7 @@
 		busy = true; error = null; notice = null;
 		try {
 			profile = toForm(await invoke<BastionProfile>('save_bastion_profile', { profile: toProfile(profile) }));
+			await refresh();
 			status = await invoke<BastionStatus>('connect_bastion', { profileId: profile.id });
 			notice = `OpenSSH is running locally${status.pid ? ` (PID ${status.pid})` : ''}.`;
 		} catch (caught) { error = String(caught); } finally { busy = false; }
@@ -58,8 +60,8 @@
 		try { status = await invoke<BastionStatus>('disconnect_bastion'); notice = 'The local OpenSSH process was stopped.'; } catch (caught) { error = String(caught); } finally { busy = false; }
 	}
 
-	function selectProfile(event: Event) {
-		const selected = profiles.find((candidate) => candidate.id === (event.currentTarget as HTMLSelectElement).value);
+	function selectProfile(profileId: string) {
+		const selected = profiles.find((candidate) => candidate.id === profileId);
 		if (selected) profile = toForm(selected);
 	}
 
@@ -95,10 +97,7 @@
 		<form class="panel" onsubmit={(event) => { event.preventDefault(); void save(); }}>
 			<div class="panel-heading"><div><h2>Connection profile</h2><p>Saved locally for repeat use. Credentials are never stored here.</p></div><Badge variant="outline">SSH</Badge></div>
 			<div class="profile-picker">
-				<label for="saved-profile">Saved profile</label>
-				<select id="saved-profile" value={profile.id} onchange={selectProfile} disabled={busy || profiles.length === 0}>
-					{#if profiles.length === 0}<option value="">No saved profiles</option>{:else}{#each profiles as savedProfile}<option value={savedProfile.id}>{savedProfile.name} — {savedProfile.username}@{savedProfile.host}</option>{/each}{/if}
-				</select>
+				<Select class="profile-select" label="Saved profile" bind:value={profile.id} options={profileOptions} placeholder="No saved profiles" disabled={busy || profiles.length === 0} onchange={selectProfile} />
 				<div class="profile-actions"><Button variant="ghost" size="sm" disabled={busy} onclick={(event) => { event.preventDefault(); createProfile(); }}>New profile</Button><Button variant="ghost" size="sm" disabled={busy || !profile.id || running()} onclick={(event) => { event.preventDefault(); void deleteProfile(); }}>Delete profile</Button></div>
 			</div>
 			<div class="fields">
@@ -140,8 +139,7 @@
 	.grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr); }
 	.panel, .security-note { background: color-mix(in srgb, var(--surface-1, #161b22) 92%, transparent); border: 1px solid var(--color-border, #30363d); border-radius: 0.85rem; padding: 1.25rem; }
 	.profile-picker { align-items: end; border-bottom: 1px solid var(--color-border, #30363d); display: grid; gap: 0.5rem 0.75rem; grid-template-columns: minmax(0, 1fr) auto; margin-top: 1.25rem; padding-bottom: 1rem; }
-	.profile-picker label { color: var(--color-text-muted, #8b949e); font-size: 0.82rem; grid-column: 1 / -1; }
-	.profile-picker select { background: var(--surface-1, #161b22); border: 1px solid var(--color-border, #30363d); border-radius: 0.45rem; color: inherit; min-width: 0; padding: 0.55rem 0.65rem; }
+	.profile-picker :global(.profile-select) { min-width: 0; }
 	.profile-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 	.fields { display: grid; gap: 0.85rem; margin-top: 1.25rem; }
 	.two-up { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
