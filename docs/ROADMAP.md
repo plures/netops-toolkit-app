@@ -6,6 +6,20 @@ netops-toolkit-app is the operator console that proves the OASIS stack in the fi
 ## Current State
 The app provides one real native workflow: a local OpenSSH SOCKS5 bastion gateway. Python, Ansible, simulated results, and unimplemented device-operation screens have been removed. Future native network workflows will return only as real implementations.
 
+## Architecture correction — extension first
+
+Netops will be implemented once as a PX-governed native Modulus extension in
+the `praxis-platform` monorepo, then distributed as both a Pares Radix extension
+and a standalone Tauri package. The public app repository is the end-user
+distribution and support surface; it is not a second network-automation source
+tree. The two projections share a Svelte surface, PluresDB records, Praxis
+decisions, and verified native host effects.
+
+Svelte-Ratatui is the terminal projection candidate. It must pass its
+pre-alpha integration gate before it is included in a production release; a
+separate raw-Ratatui implementation is out of scope. See
+[Radix extension architecture](radix-extension-architecture.md).
+
 ## Phases
 
 ### Phase 0 — Stabilize the bastion gateway (Now)

@@ -12,6 +12,16 @@ Device discovery, SSH automation, configuration collection, vendor command execu
 
 The standalone [netops-toolkit](https://github.com/plures/netops-toolkit) Python project remains active and supported for existing Python workflows.
 
+## Architecture transition
+
+The long-term product is one PX-governed Netops Radix extension and a standalone
+Tauri package built from the same operator surface and native host-effect
+boundary. The standalone package is a workstation distribution of the
+extension—not a separately implemented network automation product. See the
+[Radix extension architecture](docs/radix-extension-architecture.md) for the
+capability, data, Svelte-Ratatui, and Python-retirement gates. None of those
+future capabilities are claimed by the current release.
+
 ## Development
 
 ```bash
