@@ -14,13 +14,14 @@ The standalone [netops-toolkit](https://github.com/plures/netops-toolkit) Python
 
 ## Architecture transition
 
-The long-term product is one PX-governed Netops Radix extension and a standalone
-Tauri package built from the same operator surface and native host-effect
-boundary. The standalone package is a workstation distribution of the
-extension—not a separately implemented network automation product. See the
-[Radix extension architecture](docs/radix-extension-architecture.md) for the
-capability, data, Svelte-Ratatui, and Python-retirement gates. None of those
-future capabilities are claimed by the current release.
+The long-term product is a PX-governed Netops operator capability within the
+existing Pares Bastion Radix extension, plus a standalone Tauri package built
+from the same operator surface and native host-effect boundary. The standalone
+package is a workstation distribution of that capability—not a separately
+implemented network automation product. See the [Radix extension
+architecture](docs/radix-extension-architecture.md) for the capability, data,
+Svelte-Ratatui, and Python-retirement gates. None of those future capabilities
+are claimed by the current release.
 
 ## Development
 

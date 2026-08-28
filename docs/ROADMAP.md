@@ -8,12 +8,13 @@ The app provides one real native workflow: a local OpenSSH SOCKS5 bastion gatewa
 
 ## Architecture correction — extension first
 
-Netops will be implemented once as a PX-governed native Modulus extension in
-the `praxis-platform` monorepo, then distributed as both a Pares Radix extension
-and a standalone Tauri package. The public app repository is the end-user
-distribution and support surface; it is not a second network-automation source
-tree. The two projections share a Svelte surface, PluresDB records, Praxis
-decisions, and verified native host effects.
+Netops will be implemented as an operator capability within the existing
+PX-governed Pares Bastion native Modulus extension in the `praxis-platform`
+monorepo, then distributed as both a Pares Radix capability and a standalone
+Tauri package. The public app repository is the end-user distribution and
+support surface; it is not a second network-automation source tree. The two
+projections share a Svelte surface, PluresDB records, Praxis decisions, and
+verified native host effects.
 
 Svelte-Ratatui is the terminal projection candidate. It must pass its
 pre-alpha integration gate before it is included in a production release; a

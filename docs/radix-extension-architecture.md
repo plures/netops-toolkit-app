@@ -1,10 +1,11 @@
-# Netops Radix extension architecture
+# Netops capability architecture in Pares Bastion
 
 ## Decision
 
-`netops-toolkit` is a single local-first operator product with two projections:
+`netops-toolkit` is a local-first operator capability within the existing
+Pares Bastion native Modulus extension. It has two projections:
 
-1. a native Modulus extension hosted by Pares Radix; and
+1. the Pares Bastion extension hosted by Pares Radix; and
 2. a standalone Tauri package for operators who do not run the Radix workbench.
 
 They share one Svelte surface, one PX-governed operation model, and the same
@@ -12,16 +13,17 @@ native host-effect boundary. The standalone package is not a second network
 automation implementation.
 
 The public `plures/netops-toolkit-app` repository remains the end-user
-distribution, release, and support surface. Extension source, governance, and
-release-attestation CI belong in the `praxis-platform` monorepo alongside
-`pares-radix`, PluresDB, Praxis, and Svelte-Ratatui.
+distribution, release, and support surface. The Netops capability source,
+governance, and release-attestation CI belong with the existing Pares Bastion
+extension in the `praxis-platform` monorepo alongside `pares-radix`, PluresDB,
+Praxis, and Svelte-Ratatui.
 
 ## Current truth
 
 The current release provides only a real local OpenSSH SOCKS5 bastion workflow.
-It does not yet host a Radix extension, connect to PluresDB, evaluate PX
-procedures, or run a Ratatui projection. This document does not advertise any
-of those capabilities as shipped.
+It does not yet host the Netops capability, connect to PluresDB, evaluate PX
+procedures for device operations, or run a Ratatui projection. This document
+does not advertise any of those capabilities as shipped.
 
 The existing local bastion profile format remains supported during migration.
 No migration may delete or overwrite a user's profile or credential material.
@@ -33,8 +35,8 @@ No migration may delete or overwrite a user's profile or credential material.
                               |
           +-------------------+-------------------+
           |                                       |
-   Pares Radix host                      Standalone Tauri shell
- native Modulus extension                 packaged for the workstation
+   Pares Bastion extension                Standalone Tauri shell
+      in Pares Radix                       packaged for the workstation
           |                                       |
           +----------- shared projection ---------+
                               |
@@ -51,9 +53,9 @@ No migration may delete or overwrite a user's profile or credential material.
 
 ### Source and release ownership
 
-The extension source belongs at a monorepo path such as
-`crates/pares-radix/extensions/netops-toolkit`. It must use the native Modulus
-extension package contract:
+The Netops capability extends the existing extension at
+`crates/pares-radix/extensions/pares-bastion`. It uses that extension's native
+Modulus package contract:
 
 - `radix-extension.json` declares a versioned extension identity and requested
   capabilities.
@@ -64,13 +66,13 @@ extension package contract:
   native-extension packaging flow.
 
 The public repository consumes only attested, immutable outputs. It must not
-reimplement extension decision logic or maintain a second source-of-truth
-network core.
+reimplement Pares Bastion lifecycle or extension decision logic, or maintain a
+second source-of-truth network core.
 
 ### Capability boundary
 
-The initial manifest should request only the capabilities needed for a real
-operator session:
+The existing Pares Bastion manifest should be extended only with capabilities
+needed for a real Netops operator session:
 
 | Capability | Purpose | Boundary |
 | --- | --- | --- |
@@ -80,9 +82,10 @@ operator session:
 | `native.bastion.host-inspect` | Report an already-running bastion's bounded status | Host supplies verified facts |
 
 Starting, stopping, or changing a bastion is a separate native host effect. It
-must have an explicit manifest capability and a PX contract before it is
-available to an extension. The extension never receives a raw Tauri `invoke`
-handle, filesystem path, OpenSSH argument list, secret, or PluresDB store.
+must have an explicit Pares Bastion manifest capability and a PX contract before
+it is available to the Netops capability. The capability never receives a raw
+Tauri `invoke` handle, filesystem path, OpenSSH argument list, secret, or
+PluresDB store.
 
 ### Data and secret boundaries
 
@@ -121,12 +124,12 @@ not replace terminal-emulator qualification.
 
 ## Native replacement sequence
 
-1. Define the extension manifest, PX procedures, PluresDB record schemas, and
-   host-effect contract in `praxis-platform`.
+1. Extend the existing Pares Bastion manifest, PX procedures, PluresDB record
+   schemas, and host-effect contract in `praxis-platform`.
 2. Extract the existing real OpenSSH bastion lifecycle into the narrow native
    host-effect implementation; preserve the profile migration boundary.
-3. Build the Radix extension and the standalone Tauri shell from the same
-   Svelte source and accepted host-effect interface.
+3. Build the Pares Bastion Netops capability and the standalone Tauri shell
+   from the same Svelte source and accepted host-effect interface.
 4. Add native inventory, SSH collection, vendor identification, health,
    backup, and SNMP only when each operation has a real transport
    implementation and PX admission evidence.
