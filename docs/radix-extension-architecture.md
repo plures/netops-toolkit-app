@@ -97,9 +97,10 @@ PluresDB store.
   local user-controlled vault. UI and extension records carry opaque references
   only, never passwords, SNMP community strings, private keys, or raw
   configuration payloads.
-- Existing `bastion-profiles.json` is imported copy-first into a versioned
-  record. The importer records a receipt and leaves the source file intact
-  until an explicit user-confirmed cleanup release.
+- Existing `bastion-profiles.json` is imported copy-first. Before writing the
+  versioned record, the importer converts `identityFile`, `knownHostsFile`, and
+  `sshExecutable` paths to opaque host-managed references. It records a receipt
+  and leaves the source file intact until an explicit user-confirmed cleanup release.
 
 ## Svelte-Ratatui adoption gate
 
