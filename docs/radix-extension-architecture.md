@@ -97,6 +97,12 @@ PluresDB store.
   local user-controlled vault. UI and extension records carry opaque references
   only, never passwords, SNMP community strings, private keys, or raw
   configuration payloads.
+- Raw configuration payloads are owned by a host-managed, local encrypted
+  content vault. PluresDB stores only an opaque immutable revision reference and
+  metadata; the host resolves that reference for authorized diffs and rollback.
+  The vault encrypts each user's contents with a key from the operating-system
+  credential store and retains historical revisions until an explicit
+  user-confirmed prune.
 - Existing `bastion-profiles.json` is imported copy-first. Before writing the
   versioned record, the importer converts `identityFile`, `knownHostsFile`, and
   `sshExecutable` paths to opaque host-managed references. It records a receipt
