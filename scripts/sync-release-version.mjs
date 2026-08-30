@@ -2,21 +2,15 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const [version] = process.argv.slice(2);
-const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+export const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
-if (!version || !semverPattern.test(version)) {
-  throw new Error("Usage: node scripts/sync-release-version.mjs <semver-version>");
-}
-
-const root = resolve(import.meta.dirname, "..");
-
-async function readJson(relativePath) {
+async function readJson(root, relativePath) {
   return JSON.parse(await readFile(resolve(root, relativePath), "utf8"));
 }
 
-async function writeJson(relativePath, value) {
+async function writeJson(root, relativePath, value) {
   const filePath = resolve(root, relativePath);
   const existing = await readFile(filePath, "utf8");
   const newline = existing.includes("\r\n") ? "\r\n" : "\n";
@@ -24,7 +18,7 @@ async function writeJson(relativePath, value) {
   await writeFile(filePath, `${serialized}${newline}`);
 }
 
-function replacePackageVersion(cargoToml, filePath) {
+export function replacePackageVersion(cargoToml, filePath, version) {
   const packageHeader = "[package]";
   const start = cargoToml.indexOf(packageHeader);
   if (start === -1) {
@@ -43,18 +37,18 @@ function replacePackageVersion(cargoToml, filePath) {
   return `${cargoToml.slice(0, start + packageHeader.length)}${updatedBody}${afterPackage.slice(packageBody.length)}`;
 }
 
-async function sync() {
-  const packageJson = await readJson("package.json");
+export async function syncReleaseVersion(version, root) {
+  const packageJson = await readJson(root, "package.json");
   packageJson.version = version;
-  await writeJson("package.json", packageJson);
+  await writeJson(root, "package.json", packageJson);
 
-  const packageLock = await readJson("package-lock.json");
+  const packageLock = await readJson(root, "package-lock.json");
   packageLock.version = version;
   if (!packageLock.packages?.[""]) {
     throw new Error("package-lock.json is missing the root package record");
   }
   packageLock.packages[""].version = version;
-  await writeJson("package-lock.json", packageLock);
+  await writeJson(root, "package-lock.json", packageLock);
 
   const tauriPath = resolve(root, "src-tauri", "tauri.conf.json");
   const tauriSource = await readFile(tauriPath, "utf8");
@@ -66,7 +60,7 @@ async function sync() {
 
   const cargoPath = resolve(root, "src-tauri", "Cargo.toml");
   const cargoToml = await readFile(cargoPath, "utf8");
-  await writeFile(cargoPath, replacePackageVersion(cargoToml, "src-tauri/Cargo.toml"));
+  await writeFile(cargoPath, replacePackageVersion(cargoToml, "src-tauri/Cargo.toml", version));
 
   const cargoLockPath = resolve(root, "src-tauri", "Cargo.lock");
   const cargoLock = await readFile(cargoLockPath, "utf8");
@@ -77,4 +71,15 @@ async function sync() {
   await writeFile(cargoLockPath, cargoLock.replace(packagePattern, `$1${version}$2`));
 }
 
-await sync();
+const isMainModule =
+  process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+
+if (isMainModule) {
+  const [version] = process.argv.slice(2);
+
+  if (!version || !semverPattern.test(version)) {
+    throw new Error("Usage: node scripts/sync-release-version.mjs <semver-version>");
+  }
+
+  await syncReleaseVersion(version, resolve(import.meta.dirname, ".."));
+}
