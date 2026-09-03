@@ -1,3 +1,10 @@
+## [0.31.0] — 2026-09-03
+
+- fix(release): restore version synchronization (#83) (4cb85d3)
+- docs: define Radix extension architecture (#82) (050bce8)
+- feat: support multiple named Bastion profiles (#81) (0138379)
+- feat: add native SSH bastion gateway (#80) (7442635)
+
 ## [0.30.2] — 2026-08-24
 
 - Documented the shared release workflow's missing GitHub token that blocks Windows installer uploads (#78) (f33d2e9)
