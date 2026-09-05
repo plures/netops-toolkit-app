@@ -1,3 +1,7 @@
+## [0.31.2] — 2026-09-05
+
+- fix(release): gate candidates by parity channel (#87) (526bde6)
+
 ## [0.31.1] — 2026-09-05
 
 - ci(release): build development installer candidates (#85) (36ef717)

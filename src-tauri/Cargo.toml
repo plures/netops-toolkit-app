@@ -1,6 +1,6 @@
 [package]
 name = "netops-toolkit-app"
-version = "0.31.1"
+version = "0.31.2"
 edition = "2021"
 description = "Network operations toolkit desktop application"
 authors = ["Plures"]
