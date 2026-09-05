@@ -1,3 +1,7 @@
+## [0.31.1] — 2026-09-05
+
+- ci(release): build development installer candidates (#85) (36ef717)
+
 ## [0.31.0] — 2026-09-03
 
 - fix(release): restore version synchronization (#83) (4cb85d3)
