@@ -1,4 +1,6 @@
 # Stable (even-minor) releases publish the Windows desktop installer.
+# Development (odd-minor) releases retain a workflow-only installer candidate
+# for clean-machine acceptance testing; it is never attached to the prerelease.
 parityLaw = true
 publishPlatformInstallers = true
 platformTargets = ["windows"]
