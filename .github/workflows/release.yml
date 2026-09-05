@@ -73,48 +73,16 @@ jobs:
             gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH}"
           done
 
-  determine-development-candidates:
-    runs-on: ubuntu-latest
-    outputs:
-      build_development_candidates: ${{ steps.version.outputs.build_development_candidates }}
-    steps:
-      - name: Check whether the release should build a development candidate
-        id: version
-        shell: bash
-        env:
-          TARGET_VERSION: ${{ inputs.target_version || github.ref_name }}
-        run: |
-          set -euo pipefail
-
-          version="${TARGET_VERSION#v}"
-
-          if [[ -z "$version" || "$version" == "main" ]]; then
-            echo "build_development_candidates=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-[A-Za-z0-9.-]+)?$ ]]; then
-            minor="${BASH_REMATCH[2]}"
-            if [[ -n "${BASH_REMATCH[4]}" ]] && (( minor % 2 != 0 )); then
-              echo "build_development_candidates=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "build_development_candidates=false" >> "$GITHUB_OUTPUT"
-            fi
-            exit 0
-          fi
-
-          echo "build_development_candidates=false" >> "$GITHUB_OUTPUT"
-
   release:
-    needs:
-      - reconcile-release-branches
-      - determine-development-candidates
+    needs: reconcile-release-branches
     uses: plures/.github/.github/workflows/release-reusable.yml@main
     with:
       bump: ${{ inputs.bump || '' }}
       target_version: ${{ inputs.target_version || '' }}
       publish_npm: false
-      build_development_candidates: ${{ needs.determine-development-candidates.outputs.build_development_candidates == 'true' }}
+      # release-reusable.yml evaluates parity after it computes the actual
+      # release version. Static opt-in keeps that single authority intact.
+      build_development_candidates: true
       frontend_install: npm ci
       tauri_script: npx tauri
     secrets: inherit
