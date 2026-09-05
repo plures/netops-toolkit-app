@@ -95,7 +95,10 @@ jobs:
 
           if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-[A-Za-z0-9.-]+)?$ ]]; then
             minor="${BASH_REMATCH[2]}"
-            if [[ -n "${BASH_REMATCH[4]}" ]] && (( minor % 2 != 0 )); then
+            # The opted-in parity law defines every odd minor as the
+            # development/prerelease channel; it does not require a SemVer
+            # prerelease suffix such as "-rc.1".
+            if (( minor % 2 != 0 )); then
               echo "build_development_candidates=true" >> "$GITHUB_OUTPUT"
             else
               echo "build_development_candidates=false" >> "$GITHUB_OUTPUT"
