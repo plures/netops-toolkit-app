@@ -28,11 +28,13 @@ export function replacePackageVersion(cargoToml, filePath, version) {
   const afterPackage = cargoToml.slice(start + packageHeader.length);
   const sectionEnd = afterPackage.search(/^\[/m);
   const packageBody = sectionEnd === -1 ? afterPackage : afterPackage.slice(0, sectionEnd);
-  const updatedBody = packageBody.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`);
+  const versionPattern = /^version\s*=\s*"[^"]+"/m;
 
-  if (updatedBody === packageBody) {
+  if (!versionPattern.test(packageBody)) {
     throw new Error(`${filePath} has no package version to update`);
   }
+
+  const updatedBody = packageBody.replace(versionPattern, `version = "${version}"`);
 
   return `${cargoToml.slice(0, start + packageHeader.length)}${updatedBody}${afterPackage.slice(packageBody.length)}`;
 }

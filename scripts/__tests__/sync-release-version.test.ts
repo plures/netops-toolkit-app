@@ -147,6 +147,10 @@ describe('sync-release-version', () => {
 		expect(cargoLock).toBe(CARGO_LOCK);
 	});
 
+	it('accepts a Cargo package version already equal to the release version', () => {
+		expect(replacePackageVersion(CARGO_TOML, 'Cargo.toml', '0.30.2')).toBe(CARGO_TOML);
+	});
+
 	it('rejects invalid SemVer versions', () => {
 		for (const invalid of ['1.2', 'v1.2.3', '1.2.3.4', 'not-a-version', '']) {
 			expect(semverPattern.test(invalid)).toBe(false);
