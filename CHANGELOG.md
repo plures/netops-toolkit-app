@@ -1,3 +1,9 @@
+## [0.31.3] — 2026-09-09
+
+- fix(release): accept unchanged Cargo versions (#89) (68ae0a0)
+- chore(release): v0.31.2 (#88) (203bbed)
+- fix(release): gate candidates by parity channel (#87) (526bde6)
+
 ## [0.31.2] — 2026-09-05
 
 - fix(release): gate candidates by parity channel (#87) (526bde6)
